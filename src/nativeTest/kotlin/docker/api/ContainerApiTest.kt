@@ -40,16 +40,18 @@ class ContainerApiTest {
     }
     
     @Test
-    fun testListContainersWithDSL() = runBlocking {
-        try {
-            val containers = containerApi.listWith {
-                all = true
-                size = true
+    fun testListContainersWithDSL() {
+        runBlocking {
+            try {
+                val containers = containerApi.listWith {
+                    all = true
+                    size = true
+                }
+                assertNotNull(containers, "Container list should not be null")
+            } catch (e: Exception) {
+                println("Warning: Could not connect to Docker daemon: ${e.message}")
+                println("Skipping test - this is expected if Docker is not running")
             }
-            assertNotNull(containers, "Container list should not be null")
-        } catch (e: Exception) {
-            println("Warning: Could not connect to Docker daemon: ${e.message}")
-            println("Skipping test - this is expected if Docker is not running")
         }
     }
     

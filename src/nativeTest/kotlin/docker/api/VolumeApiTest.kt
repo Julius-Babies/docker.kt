@@ -31,6 +31,7 @@ class VolumeApiTest {
             val volumes = volumeApi.list()
             assertNotNull(volumes, "Volume list should not be null")
             assertTrue(volumes is List, "Should return a list")
+            println("Found ${volumes.size} volume(s)")
         } catch (e: Exception) {
             println("Warning: Could not connect to Docker daemon: ${e.message}")
             println("Skipping test - this is expected if Docker is not running")
@@ -38,15 +39,17 @@ class VolumeApiTest {
     }
     
     @Test
-    fun testListVolumesWithDSL() = runBlocking {
-        try {
-            val volumes = volumeApi.listWith {
-                // No filters for now
+    fun testListVolumesWithDSL() {
+        runBlocking {
+            try {
+                val volumes = volumeApi.listWith {
+                    // No filters for now
+                }
+                assertNotNull(volumes, "Volume list should not be null")
+            } catch (e: Exception) {
+                println("Warning: Could not connect to Docker daemon: ${e.message}")
+                println("Skipping test - this is expected if Docker is not running")
             }
-            assertNotNull(volumes, "Volume list should not be null")
-        } catch (e: Exception) {
-            println("Warning: Could not connect to Docker daemon: ${e.message}")
-            println("Skipping test - this is expected if Docker is not running")
         }
     }
     

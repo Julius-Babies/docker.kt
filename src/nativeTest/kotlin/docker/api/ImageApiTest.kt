@@ -15,6 +15,7 @@ class ImageApiTest {
     
     @BeforeTest
     fun setup() {
+        println("setup")
         client = DockerClient(DockerClientConfig.default())
         imageApi = client.images
     }
@@ -37,15 +38,18 @@ class ImageApiTest {
     }
     
     @Test
-    fun testListImagesWithDSL() = runBlocking {
-        try {
-            val images = imageApi.listWith {
-                all = true
+    fun testListImagesWithDSL() {
+        runBlocking {
+            try {
+                val images = imageApi.listWith {
+                    all = true
+                }
+                assertNotNull(images, "Image list should not be null")
+                images.forEach { println(it) }
+            } catch (e: Exception) {
+                println("Warning: Could not connect to Docker daemon: ${e.message}")
+                println("Skipping test - this is expected if Docker is not running")
             }
-            assertNotNull(images, "Image list should not be null")
-        } catch (e: Exception) {
-            println("Warning: Could not connect to Docker daemon: ${e.message}")
-            println("Skipping test - this is expected if Docker is not running")
         }
     }
     

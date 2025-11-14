@@ -46,15 +46,17 @@ class NetworkApiTest {
     }
     
     @Test
-    fun testListNetworksWithDSL() = runBlocking {
-        try {
-            val networks = networkApi.listWith {
-                // No filters for now
+    fun testListNetworksWithDSL() {
+        runBlocking {
+            try {
+                val networks = networkApi.listWith {
+                    // No filters for now
+                }
+                assertNotNull(networks, "Network list should not be null")
+            } catch (e: Exception) {
+                println("Warning: Could not connect to Docker daemon: ${e.message}")
+                println("Skipping test - this is expected if Docker is not running")
             }
-            assertNotNull(networks, "Network list should not be null")
-        } catch (e: Exception) {
-            println("Warning: Could not connect to Docker daemon: ${e.message}")
-            println("Skipping test - this is expected if Docker is not running")
         }
     }
     
