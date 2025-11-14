@@ -14,6 +14,9 @@ data class DockerClientConfig(
         private const val MAIN_SOCKET_PATH = "/var/run/docker.sock"
         private const val USER_SOCKET_TEMPLATE = "/.docker/run/docker.sock"
         
+        // S_IFSOCK constant for socket file type (octal 0140000)
+        private const val S_IFSOCK: UInt = 0xC000u
+        
         /**
          * Creates a default configuration with automatic socket detection and fallback.
          * First tries the main Docker socket at /var/run/docker.sock
@@ -49,16 +52,20 @@ data class DockerClientConfig(
         
         /**
          * Checks if a socket file exists and is a socket.
+         * Uses manual bit-masking since S_ISSOCK macro may not be available in all contexts.
          */
+        @OptIn(ExperimentalForeignApi::class)
         private fun socketExists(path: String): Boolean {
             memScoped {
                 val statBuf = alloc<stat>()
                 val result = stat(path, statBuf.ptr)
                 
                 if (result == 0) {
-                    // Check if it's a socket (S_IFSOCK)
-                    val mode = statBuf.st_mode.toInt()
-                    return (mode and S_IFSOCK.toInt()) != 0
+                    // Check if it's a socket by masking the mode with S_IFMT (0xF000)
+                    // and comparing with S_IFSOCK (0xC000)
+                    val mode = statBuf.st_mode.toUInt()
+                    val fileType = mode and 0xF000u
+                    return fileType == S_IFSOCK
                 }
                 return false
             }

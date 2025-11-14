@@ -38,14 +38,14 @@ class UnixSocketClient(private val socketPath: String) {
             }
             
             // Connect to socket
-            val result = connect(
+            val result = platform.posix.connect(
                 socketFd,
                 addr.ptr.reinterpret(),
                 sizeOf<sockaddr_un>().convert()
             )
             
             if (result < 0) {
-                close(socketFd)
+                platform.posix.close(socketFd)
                 socketFd = -1
                 throw DockerException("Failed to connect to socket $socketPath: ${strerror(errno)?.toKString()}")
             }
@@ -179,7 +179,7 @@ class UnixSocketClient(private val socketPath: String) {
      */
     fun close() {
         if (socketFd >= 0) {
-            close(socketFd)
+            platform.posix.close(socketFd)
             socketFd = -1
         }
     }
