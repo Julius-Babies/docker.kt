@@ -1,25 +1,39 @@
-import io.ktor.client.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.request.get
-import io.ktor.client.statement.bodyAsText
-import io.ktor.serialization.kotlinx.json.*
+import docker.client.DockerClient
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.Json
 
-fun main() {
-    val client = HttpClient {
-        install(ContentNegotiation) {
-            json(Json {
-                prettyPrint = true
-                isLenient = true
-            })
+fun main() = runBlocking {
+    println("Docker.kt - Socket Client with Fallback Demo")
+    println("=" .repeat(50))
+    
+    val client = DockerClient()
+    
+    try {
+        println("Using socket: ${client.getSocketPath()}")
+        println()
+        
+        // Test connectivity
+        print("Testing Docker connection... ")
+        val isConnected = client.ping()
+        if (isConnected) {
+            println("✓ Connected")
+            
+            // Get Docker version
+            println("\nDocker Version:")
+            println(client.version())
+            
+            // Get Docker info
+            println("\nDocker Info:")
+            println(client.info())
+        } else {
+            println("✗ Failed to connect")
+            println("Please make sure Docker daemon is running.")
         }
-    }
-
-    runBlocking {
-        print("Lade IP...")
-        val response = client.get("https://checkip.amazonaws.com")
-        print("\r")
-        println(response.bodyAsText())
+    } catch (e: Exception) {
+        println("Error: ${e.message}")
+        println("\nSocket fallback attempted:")
+        println("  1. Main socket: /var/run/docker.sock")
+        println("  2. User socket: \$HOME/.docker/run/docker.sock")
+    } finally {
+        client.close()
     }
 }
