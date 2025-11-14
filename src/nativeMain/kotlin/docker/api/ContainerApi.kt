@@ -32,14 +32,13 @@ class ContainerApi(private val client: HttpDockerClient) {
         size: Boolean = false,
         filters: String? = null
     ): List<Container> {
-        val params = mutableListOf<String>()
-        if (all) params.add("all=true")
-        if (limit != null) params.add("limit=$limit")
-        if (size) params.add("size=true")
-        if (filters != null) params.add("filters=$filters")
+        val params = mutableMapOf<String, String>()
+        if (all) params["all"] = "true"
+        if (limit != null) params["limit"] = limit.toString()
+        if (size) params["size"] = "true"
+        if (filters != null) params["filters"] = filters
         
-        val query = if (params.isNotEmpty()) "?${params.joinToString("&")}" else ""
-        val response = client.get("/containers/json$query")
+        val response = client.get("/containers/json", params)
         
         if (!response.isSuccessful()) {
             throw DockerException("Failed to list containers: ${response.statusCode} - ${response.body}")
@@ -57,9 +56,11 @@ class ContainerApi(private val client: HttpDockerClient) {
      * @throws DockerException if the operation fails
      */
     suspend fun create(config: ContainerConfig, name: String? = null): ContainerCreateResponse {
-        val query = if (name != null) "?name=$name" else ""
+        val params = mutableMapOf<String, String>()
+        if (name != null) params["name"] = name
+        
         val body = json.encodeToString(config)
-        val response = client.post("/containers/create$query", body)
+        val response = client.post("/containers/create", params, body)
         
         if (!response.isSuccessful()) {
             throw DockerException("Failed to create container: ${response.statusCode} - ${response.body}")
@@ -91,7 +92,8 @@ class ContainerApi(private val client: HttpDockerClient) {
      * @throws DockerException if the operation fails
      */
     suspend fun stop(id: String, timeout: Int = 10) {
-        val response = client.post("/containers/$id/stop?t=$timeout")
+        val params = mapOf("t" to timeout.toString())
+        val response = client.post("/containers/$id/stop", params)
         
         if (!response.isSuccessful() && response.statusCode != 304) {
             // 304 means container was already stopped
@@ -107,7 +109,8 @@ class ContainerApi(private val client: HttpDockerClient) {
      * @throws DockerException if the operation fails
      */
     suspend fun restart(id: String, timeout: Int = 10) {
-        val response = client.post("/containers/$id/restart?t=$timeout")
+        val params = mapOf("t" to timeout.toString())
+        val response = client.post("/containers/$id/restart", params)
         
         if (!response.isSuccessful()) {
             throw DockerException("Failed to restart container: ${response.statusCode} - ${response.body}")
@@ -122,7 +125,8 @@ class ContainerApi(private val client: HttpDockerClient) {
      * @throws DockerException if the operation fails
      */
     suspend fun kill(id: String, signal: String = "SIGKILL") {
-        val response = client.post("/containers/$id/kill?signal=$signal")
+        val params = mapOf("signal" to signal)
+        val response = client.post("/containers/$id/kill", params)
         
         if (!response.isSuccessful()) {
             throw DockerException("Failed to kill container: ${response.statusCode} - ${response.body}")
@@ -166,12 +170,11 @@ class ContainerApi(private val client: HttpDockerClient) {
      * @throws DockerException if the operation fails
      */
     suspend fun remove(id: String, force: Boolean = false, volumes: Boolean = false) {
-        val params = mutableListOf<String>()
-        if (force) params.add("force=true")
-        if (volumes) params.add("v=true")
+        val params = mutableMapOf<String, String>()
+        if (force) params["force"] = "true"
+        if (volumes) params["v"] = "true"
         
-        val query = if (params.isNotEmpty()) "?${params.joinToString("&")}" else ""
-        val response = client.delete("/containers/$id$query")
+        val response = client.delete("/containers/$id", params)
         
         if (!response.isSuccessful()) {
             throw DockerException("Failed to remove container: ${response.statusCode} - ${response.body}")
@@ -187,8 +190,10 @@ class ContainerApi(private val client: HttpDockerClient) {
      * @throws DockerException if the operation fails
      */
     suspend fun inspect(id: String, size: Boolean = false): ContainerInspect {
-        val query = if (size) "?size=true" else ""
-        val response = client.get("/containers/$id/json$query")
+        val params = mutableMapOf<String, String>()
+        if (size) params["size"] = "true"
+        
+        val response = client.get("/containers/$id/json", params)
         
         if (!response.isSuccessful()) {
             throw DockerException("Failed to inspect container: ${response.statusCode} - ${response.body}")
@@ -215,14 +220,13 @@ class ContainerApi(private val client: HttpDockerClient) {
         tail: Int? = null,
         timestamps: Boolean = false
     ): String {
-        val params = mutableListOf<String>()
-        if (stdout) params.add("stdout=true")
-        if (stderr) params.add("stderr=true")
-        if (tail != null) params.add("tail=$tail")
-        if (timestamps) params.add("timestamps=true")
+        val params = mutableMapOf<String, String>()
+        if (stdout) params["stdout"] = "true"
+        if (stderr) params["stderr"] = "true"
+        if (tail != null) params["tail"] = tail.toString()
+        if (timestamps) params["timestamps"] = "true"
         
-        val query = if (params.isNotEmpty()) "?${params.joinToString("&")}" else ""
-        val response = client.get("/containers/$id/logs$query")
+        val response = client.get("/containers/$id/logs", params)
         
         if (!response.isSuccessful()) {
             throw DockerException("Failed to get container logs: ${response.statusCode} - ${response.body}")
@@ -238,8 +242,10 @@ class ContainerApi(private val client: HttpDockerClient) {
      * @throws DockerException if the operation fails
      */
     suspend fun prune(filters: String? = null) {
-        val query = if (filters != null) "?filters=$filters" else ""
-        val response = client.post("/containers/prune$query")
+        val params = mutableMapOf<String, String>()
+        if (filters != null) params["filters"] = filters
+        
+        val response = client.post("/containers/prune", params)
         
         if (!response.isSuccessful()) {
             throw DockerException("Failed to prune containers: ${response.statusCode} - ${response.body}")

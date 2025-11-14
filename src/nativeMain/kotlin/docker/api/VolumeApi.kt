@@ -24,8 +24,10 @@ class VolumeApi(private val client: HttpDockerClient) {
      * @throws DockerException if the operation fails
      */
     suspend fun list(filters: String? = null): List<Volume> {
-        val query = if (filters != null) "?filters=$filters" else ""
-        val response = client.get("/volumes$query")
+        val params = mutableMapOf<String, String>()
+        if (filters != null) params["filters"] = filters
+        
+        val response = client.get("/volumes", params)
         
         if (!response.isSuccessful()) {
             throw DockerException("Failed to list volumes: ${response.statusCode} - ${response.body}")
@@ -78,8 +80,10 @@ class VolumeApi(private val client: HttpDockerClient) {
      * @throws DockerException if the operation fails
      */
     suspend fun remove(name: String, force: Boolean = false) {
-        val query = if (force) "?force=true" else ""
-        val response = client.delete("/volumes/$name$query")
+        val params = mutableMapOf<String, String>()
+        if (force) params["force"] = "true"
+        
+        val response = client.delete("/volumes/$name", params)
         
         if (!response.isSuccessful()) {
             throw DockerException("Failed to remove volume: ${response.statusCode} - ${response.body}")
@@ -94,8 +98,10 @@ class VolumeApi(private val client: HttpDockerClient) {
      * @throws DockerException if the operation fails
      */
     suspend fun prune(filters: String? = null): VolumePruneResponse {
-        val query = if (filters != null) "?filters=$filters" else ""
-        val response = client.post("/volumes/prune$query")
+        val params = mutableMapOf<String, String>()
+        if (filters != null) params["filters"] = filters
+        
+        val response = client.post("/volumes/prune", params)
         
         if (!response.isSuccessful()) {
             throw DockerException("Failed to prune volumes: ${response.statusCode} - ${response.body}")

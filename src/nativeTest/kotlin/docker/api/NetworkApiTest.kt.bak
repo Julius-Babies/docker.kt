@@ -15,48 +15,27 @@ class NetworkApiTest {
     private lateinit var networkApi: NetworkApi
     private lateinit var containerApi: ContainerApi
     private lateinit var imageApi: ImageApi
-    private var dockerAvailable = false
     
     @BeforeTest
     fun setup() {
         client = DockerClient(DockerClientConfig.default())
-        client = DockerClient(DockerClientConfig.default())
         networkApi = client.networks
         containerApi = client.containers
         imageApi = client.images
-        
-        // Check if Docker is available
-        dockerAvailable = runBlocking {
-            try {
-                client.ping()
-            } catch (e: Exception) {
-                false
-            }
-        }
     }
     
     @AfterTest
     fun teardown() {
         client.close()
     }
-    }
-    
-    private fun requireDocker() {
-        if (!dockerAvailable) {
-            println("Skipping test - Docker daemon is not available")
-            return
-        }
-    }
     
     @Test
     fun testListNetworks() = runBlocking {
-            requireDocker()
-            if (!dockerAvailable) return@runBlocking
-            
         try {
             val networks = networkApi.list()
             assertNotNull(networks, "Network list should not be null")
             assertTrue(networks.isNotEmpty(), "Should have at least default networks")
+            
             // Docker should have at least the bridge network
             val hasBridge = networks.any { it.name == "bridge" }
             assertTrue(hasBridge, "Should have bridge network")
@@ -68,22 +47,21 @@ class NetworkApiTest {
     
     @Test
     fun testListNetworksWithDSL() {
-            requireDocker()
-            if (!dockerAvailable) return@runBlocking
-            
         runBlocking {
-            val networks = networkApi.listWith {
+            try {
+                val networks = networkApi.listWith {
                     // No filters for now
                 }
                 assertNotNull(networks, "Network list should not be null")
+            } catch (e: Exception) {
+                println("Warning: Could not connect to Docker daemon: ${e.message}")
+                println("Skipping test - this is expected if Docker is not running")
+            }
         }
     }
     
     @Test
     fun testCreateAndRemoveNetwork() = runBlocking {
-            requireDocker()
-            if (!dockerAvailable) return@runBlocking
-            
         try {
             // Create a network
             val request = NetworkCreateRequest(
@@ -93,10 +71,12 @@ class NetworkApiTest {
             val response = networkApi.create(request)
             assertNotNull(response, "Create response should not be null")
             assertTrue(response.id.isNotEmpty(), "Network ID should not be empty")
+            
             // Verify it was created
             val networks = networkApi.list()
             val exists = networks.any { it.name == "test-network" }
             assertTrue(exists, "Created network should exist in list")
+            
             // Remove the network
             networkApi.remove(response.id)
         } catch (e: Exception) {
@@ -114,9 +94,6 @@ class NetworkApiTest {
     
     @Test
     fun testCreateNetworkWithDSL() = runBlocking {
-            requireDocker()
-            if (!dockerAvailable) return@runBlocking
-            
         try {
             // Create network using DSL
             val response = networkApi.createWith {
@@ -128,22 +105,27 @@ class NetworkApiTest {
                     subnet("172.20.0.0/16", gateway = "172.20.0.1")
                 }
             }
+            
             assertNotNull(response, "Create response should not be null")
             assertTrue(response.id.isNotEmpty(), "Network ID should not be empty")
+            
             // Inspect the network to verify configuration
             val network = networkApi.inspect(response.id)
             assertNotNull(network, "Network should not be null")
             assertEquals("test-dsl-network", network.name, "Network name should match")
+            
             // Check labels
             val labels = network.labels
             assertNotNull(labels, "Labels should not be null")
             assertEquals("true", labels["test"], "Test label should be set")
+            
             // Check IPAM
             val ipam = network.ipam
             assertNotNull(ipam, "IPAM should not be null")
             val config = ipam.config
             assertNotNull(config, "IPAM config should not be null")
             assertTrue(config.isNotEmpty(), "IPAM config should have entries")
+            
             // Clean up
             networkApi.remove(response.id)
         } catch (e: Exception) {
@@ -161,18 +143,17 @@ class NetworkApiTest {
     
     @Test
     fun testInspectNetwork() = runBlocking {
-            requireDocker()
-            if (!dockerAvailable) return@runBlocking
-            
         try {
             // Create a network first
             val request = NetworkCreateRequest(name = "test-inspect-network")
             val createResponse = networkApi.create(request)
+            
             // Inspect it
             val network = networkApi.inspect(createResponse.id)
             assertNotNull(network, "Network should not be null")
             assertEquals("test-inspect-network", network.name, "Network name should match")
             assertEquals(createResponse.id, network.id, "Network IDs should match")
+            
             // Clean up
             networkApi.remove(createResponse.id)
         } catch (e: Exception) {
@@ -190,24 +171,26 @@ class NetworkApiTest {
     
     @Test
     fun testConnectAndDisconnectContainer() = runBlocking {
-            requireDocker()
-            if (!dockerAvailable) return@runBlocking
-            
         try {
             // Create a network
             val networkRequest = NetworkCreateRequest(name = "test-connect-network")
             val networkResponse = networkApi.create(networkRequest)
+            
             // Pull test image and create a container
             imageApi.pull("hello-world", "latest")
             val containerConfig = ContainerConfig(image = "hello-world:latest")
             val containerResponse = containerApi.create(containerConfig, "test-connect-container")
+            
             // Connect container to network
             networkApi.connectContainer(networkResponse.id, containerResponse.id)
+            
             // Disconnect container from network
             networkApi.disconnectContainer(networkResponse.id, containerResponse.id)
+            
             // Clean up
             containerApi.remove(containerResponse.id, force = true)
             networkApi.remove(networkResponse.id)
+            
             try {
                 imageApi.remove("hello-world:latest", force = true)
             } catch (e: Exception) {

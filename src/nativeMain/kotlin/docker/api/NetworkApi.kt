@@ -24,8 +24,10 @@ class NetworkApi(private val client: HttpDockerClient) {
      * @throws DockerException if the operation fails
      */
     suspend fun list(filters: String? = null): List<Network> {
-        val query = if (filters != null) "?filters=$filters" else ""
-        val response = client.get("/networks$query")
+        val params = mutableMapOf<String, String>()
+        if (filters != null) params["filters"] = filters
+        
+        val response = client.get("/networks", params)
         
         if (!response.isSuccessful()) {
             throw DockerException("Failed to list networks: ${response.statusCode} - ${response.body}")
@@ -62,12 +64,11 @@ class NetworkApi(private val client: HttpDockerClient) {
      * @throws DockerException if the network is not found or operation fails
      */
     suspend fun inspect(id: String, verbose: Boolean = false, scope: String? = null): Network {
-        val params = mutableListOf<String>()
-        if (verbose) params.add("verbose=true")
-        if (scope != null) params.add("scope=$scope")
+        val params = mutableMapOf<String, String>()
+        if (verbose) params["verbose"] = "true"
+        if (scope != null) params["scope"] = scope
         
-        val query = if (params.isNotEmpty()) "?${params.joinToString("&")}" else ""
-        val response = client.get("/networks/$id$query")
+        val response = client.get("/networks/$id", params)
         
         if (!response.isSuccessful()) {
             throw DockerException("Failed to inspect network: ${response.statusCode} - ${response.body}")
@@ -130,8 +131,10 @@ class NetworkApi(private val client: HttpDockerClient) {
      * @throws DockerException if the operation fails
      */
     suspend fun prune(filters: String? = null): NetworkPruneResponse {
-        val query = if (filters != null) "?filters=$filters" else ""
-        val response = client.post("/networks/prune$query")
+        val params = mutableMapOf<String, String>()
+        if (filters != null) params["filters"] = filters
+        
+        val response = client.post("/networks/prune", params)
         
         if (!response.isSuccessful()) {
             throw DockerException("Failed to prune networks: ${response.statusCode} - ${response.body}")

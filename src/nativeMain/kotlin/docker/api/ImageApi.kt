@@ -26,12 +26,11 @@ class ImageApi(private val client: HttpDockerClient) {
      * @throws DockerException if the operation fails
      */
     suspend fun list(all: Boolean = false, filters: String? = null): List<Image> {
-        val params = mutableListOf<String>()
-        if (all) params.add("all=true")
-        if (filters != null) params.add("filters=$filters")
+        val params = mutableMapOf<String, String>()
+        if (all) params["all"] = "true"
+        if (filters != null) params["filters"] = filters
         
-        val query = if (params.isNotEmpty()) "?${params.joinToString("&")}" else ""
-        val response = client.get("/images/json$query")
+        val response = client.get("/images/json", params)
         
         if (!response.isSuccessful()) {
             throw DockerException("Failed to list images: ${response.statusCode} - ${response.body}")
@@ -66,12 +65,11 @@ class ImageApi(private val client: HttpDockerClient) {
      * @throws DockerException if the operation fails
      */
     suspend fun remove(name: String, force: Boolean = false, noprune: Boolean = false) {
-        val params = mutableListOf<String>()
-        if (force) params.add("force=true")
-        if (noprune) params.add("noprune=true")
+        val params = mutableMapOf<String, String>()
+        if (force) params["force"] = "true"
+        if (noprune) params["noprune"] = "true"
         
-        val query = if (params.isNotEmpty()) "?${params.joinToString("&")}" else ""
-        val response = client.delete("/images/$name$query")
+        val response = client.delete("/images/$name", params)
         
         if (!response.isSuccessful()) {
             throw DockerException("Failed to remove image: ${response.statusCode} - ${response.body}")
@@ -88,7 +86,11 @@ class ImageApi(private val client: HttpDockerClient) {
      */
     suspend fun pull(name: String, tag: String = "latest", registry: String? = null) {
         val fromImage = if (registry != null) "$registry/$name" else name
-        val response = client.post("/images/create?fromImage=$fromImage&tag=$tag")
+        val params = mapOf(
+            "fromImage" to fromImage,
+            "tag" to tag
+        )
+        val response = client.post("/images/create", params)
         
         if (!response.isSuccessful()) {
             throw DockerException("Failed to pull image: ${response.statusCode} - ${response.body}")
@@ -104,7 +106,11 @@ class ImageApi(private val client: HttpDockerClient) {
      * @throws DockerException if the operation fails
      */
     suspend fun tag(name: String, repo: String, tag: String = "latest") {
-        val response = client.post("/images/$name/tag?repo=$repo&tag=$tag")
+        val params = mapOf(
+            "repo" to repo,
+            "tag" to tag
+        )
+        val response = client.post("/images/$name/tag", params)
         
         if (!response.isSuccessful()) {
             throw DockerException("Failed to tag image: ${response.statusCode} - ${response.body}")
@@ -119,7 +125,8 @@ class ImageApi(private val client: HttpDockerClient) {
      * @throws DockerException if the operation fails
      */
     suspend fun push(name: String, tag: String = "latest") {
-        val response = client.post("/images/$name/push?tag=$tag")
+        val params = mapOf("tag" to tag)
+        val response = client.post("/images/$name/push", params)
         
         if (!response.isSuccessful()) {
             throw DockerException("Failed to push image: ${response.statusCode} - ${response.body}")
@@ -134,8 +141,10 @@ class ImageApi(private val client: HttpDockerClient) {
      * @throws DockerException if the operation fails
      */
     suspend fun prune(filters: String? = null): Long {
-        val query = if (filters != null) "?filters=$filters" else ""
-        val response = client.post("/images/prune$query")
+        val params = mutableMapOf<String, String>()
+        if (filters != null) params["filters"] = filters
+        
+        val response = client.post("/images/prune", params)
         
         if (!response.isSuccessful()) {
             throw DockerException("Failed to prune images: ${response.statusCode} - ${response.body}")
