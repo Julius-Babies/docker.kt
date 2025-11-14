@@ -1,5 +1,9 @@
 package docker.client
 
+import docker.api.ContainerApi
+import docker.api.ImageApi
+import docker.api.NetworkApi
+import docker.api.VolumeApi
 import docker.exceptions.DockerException
 
 /**
@@ -10,6 +14,26 @@ class DockerClient(
     private val config: DockerClientConfig = DockerClientConfig.default()
 ) {
     private val httpClient = HttpDockerClient(config)
+    
+    /**
+     * API for managing Docker images.
+     */
+    val images = ImageApi(httpClient)
+    
+    /**
+     * API for managing Docker containers.
+     */
+    val containers = ContainerApi(httpClient)
+    
+    /**
+     * API for managing Docker volumes.
+     */
+    val volumes = VolumeApi(httpClient)
+    
+    /**
+     * API for managing Docker networks.
+     */
+    val networks = NetworkApi(httpClient)
     
     /**
      * Pings the Docker daemon to check connectivity.

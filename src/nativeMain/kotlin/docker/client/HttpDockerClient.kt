@@ -1,6 +1,7 @@
 package docker.client
 
 import docker.exceptions.DockerException
+import io.ktor.http.*
 
 /**
  * HTTP client for Docker API communication over Unix domain sockets.
@@ -12,22 +13,42 @@ class HttpDockerClient(private val config: DockerClientConfig) {
     /**
      * Performs a GET request to the Docker API.
      */
-    suspend fun get(path: String): HttpResponse {
-        return request("GET", path)
+    suspend fun get(path: String, params: Map<String, String> = emptyMap()): HttpResponse {
+        val fullPath = buildPath(path, params)
+        return request("GET", fullPath)
     }
     
     /**
      * Performs a POST request to the Docker API.
      */
-    suspend fun post(path: String, body: String? = null): HttpResponse {
-        return request("POST", path, body)
+    suspend fun post(path: String, params: Map<String, String> = emptyMap(), body: String? = null): HttpResponse {
+        val fullPath = buildPath(path, params)
+        return request("POST", fullPath, body)
     }
     
     /**
      * Performs a DELETE request to the Docker API.
      */
-    suspend fun delete(path: String): HttpResponse {
-        return request("DELETE", path)
+    suspend fun delete(path: String, params: Map<String, String> = emptyMap()): HttpResponse {
+        val fullPath = buildPath(path, params)
+        return request("DELETE", fullPath)
+    }
+    
+    /**
+     * Builds a path with query parameters using Ktor's URLBuilder.
+     */
+    private fun buildPath(path: String, params: Map<String, String>): String {
+        if (params.isEmpty()) return path
+        
+        val url = URLBuilder().apply {
+            encodedPath = path
+            params.forEach { (key, value) ->
+                parameters.append(key, value)
+            }
+        }.buildString()
+        
+        // Extract just the path and query string (remove protocol/host)
+        return url.substringAfter("://").substringAfter("/")
     }
     
     /**
