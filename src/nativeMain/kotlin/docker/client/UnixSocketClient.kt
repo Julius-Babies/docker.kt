@@ -2,6 +2,7 @@ package docker.client
 
 import docker.exceptions.DockerException
 import kotlinx.cinterop.*
+import platform.osx.sockaddr_un
 import platform.posix.*
 
 /**

@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalForeignApi::class)
+
 package docker.client
 
 import kotlinx.cinterop.*
