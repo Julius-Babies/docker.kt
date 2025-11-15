@@ -2,28 +2,42 @@ package docker
 
 import api.image.ImageApi
 import api.info.DockerInfo
+import io.ktor.client.HttpClient
 import io.ktor.client.call.*
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.*
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
+import io.ktor.serialization.kotlinx.json.json
+import kotlinx.serialization.json.Json
 
 class DockerClient: AutoCloseable {
-    internal val httpClient = getHttpClient()
+    internal val socket = getHttpClient()
+    internal val httpClient = HttpClient {
+        install(ContentNegotiation) {
+            json(Json {
+                ignoreUnknownKeys = true
+                isLenient = true
+                prettyPrint = true
+            })
+        }
+    }
 
     val images = ImageApi(this)
 
     suspend fun getInfo(): DockerInfo {
-        val response = httpClient.get("/info")
+        val response = socket.get("/info")
         println(response.bodyAsText())
         return response.body()
     }
 
     suspend fun ping(): Boolean {
-        val response = httpClient.get("/_ping")
+        val response = socket.get("/_ping")
         return response.status.isSuccess()
     }
 
     override fun close() {
+        socket.close()
         httpClient.close()
     }
 }

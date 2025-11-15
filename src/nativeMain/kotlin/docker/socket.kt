@@ -4,6 +4,7 @@ package docker
 
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.serialization.kotlinx.json.json
@@ -13,6 +14,8 @@ import kotlinx.serialization.json.Json
 import platform.posix.F_OK
 import platform.posix.access
 import platform.posix.getenv
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.seconds
 
 fun getSocketPath(): String {
     val systemPath = "/var/run/docker.sock"
@@ -42,6 +45,12 @@ fun getHttpClient(): HttpClient {
                 isLenient = true
                 prettyPrint = true
             })
+        }
+
+        install(HttpTimeout) {
+            requestTimeoutMillis = 24.hours.inWholeMilliseconds
+            connectTimeoutMillis = 15.seconds.inWholeMilliseconds
+            socketTimeoutMillis = 24.hours.inWholeMilliseconds
         }
     }
 
