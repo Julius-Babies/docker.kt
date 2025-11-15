@@ -1,7 +1,7 @@
 package api.info
-
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 @Serializable
 data class DockerInfo(
@@ -40,7 +40,7 @@ data class DockerInfo(
     @SerialName("RegistryConfig") val registryConfig: RegistryConfig,
     @SerialName("NCPU") val nCpu: Int,
     @SerialName("MemTotal") val memTotal: Long,
-    @SerialName("GenericResources") val genericResources: String? = null,
+    @SerialName("GenericResources") val genericResources: JsonElement? = null,
     @SerialName("DockerRootDir") val dockerRootDir: String,
     @SerialName("HttpProxy") val httpProxy: String? = null,
     @SerialName("HttpsProxy") val httpsProxy: String? = null,
@@ -60,14 +60,19 @@ data class DockerInfo(
     @SerialName("InitCommit") val initCommit: CommitInfo,
     @SerialName("SecurityOptions") val securityOptions: List<String> = emptyList(),
     @SerialName("CDISpecDirs") val cdiSpecDirs: List<String> = emptyList(),
-    @SerialName("Warnings") val warnings: String? = null
+    @SerialName("Warnings") val warnings: String? = null,
+
+    // New fields
+    @SerialName("FirewallBackend") val firewallBackend: FirewallBackend? = null,
+    @SerialName("DiscoveredDevices") val discoveredDevices: List<DiscoveredDevice>? = null,
+    @SerialName("Containerd") val containerd: ContainerdInfo? = null
 )
 
 @Serializable
 data class Plugins(
     @SerialName("Volume") val volume: List<String> = emptyList(),
     @SerialName("Network") val network: List<String> = emptyList(),
-    @SerialName("Authorization") val authorization: String? = null,
+    @SerialName("Authorization") val authorization: JsonElement? = null,
     @SerialName("Log") val log: List<String> = emptyList()
 )
 
@@ -75,7 +80,7 @@ data class Plugins(
 data class RegistryConfig(
     @SerialName("IndexConfigs") val indexConfigs: Map<String, IndexConfig> = emptyMap(),
     @SerialName("InsecureRegistryCIDRs") val insecureRegistryCidrs: List<String> = emptyList(),
-    @SerialName("Mirrors") val mirrors: String? = null
+    @SerialName("Mirrors") val mirrors: JsonElement? = null
 )
 
 @Serializable
@@ -88,7 +93,10 @@ data class IndexConfig(
 
 @Serializable
 data class RuntimeInfo(
-    @SerialName("path") val path: String
+    @SerialName("path") val path: String,
+    @SerialName("status") val status: JsonElement? = null,
+    @SerialName("annotations") val annotations: JsonElement? = null,
+    @SerialName("potentiallyUnsafeConfigAnnotations") val potentiallyUnsafeConfigAnnotations: List<String>? = null
 )
 
 @Serializable
@@ -98,11 +106,34 @@ data class SwarmInfo(
     @SerialName("LocalNodeState") val localNodeState: String,
     @SerialName("ControlAvailable") val controlAvailable: Boolean,
     @SerialName("Error") val error: String? = null,
-    @SerialName("RemoteManagers") val remoteManagers: String? = null
+    @SerialName("RemoteManagers") val remoteManagers: JsonElement? = null
 )
 
 @Serializable
 data class CommitInfo(
     @SerialName("ID") val id: String,
-    @SerialName("Expected") val expected: String
+    @SerialName("Expected") val expected: String? = null
+)
+
+@Serializable
+data class FirewallBackend(
+    @SerialName("Driver") val driver: String
+)
+
+@Serializable
+data class DiscoveredDevice(
+    @SerialName("Source") val source: String,
+    @SerialName("ID") val id: String
+)
+
+@Serializable
+data class ContainerdInfo(
+    @SerialName("Address") val address: String,
+    @SerialName("Namespaces") val namespaces: ContainerdNamespaces
+)
+
+@Serializable
+data class ContainerdNamespaces(
+    @SerialName("Containers") val containers: String,
+    @SerialName("Plugins") val plugins: String
 )

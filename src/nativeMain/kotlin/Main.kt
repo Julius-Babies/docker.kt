@@ -8,5 +8,6 @@ fun main() = runBlocking {
     client.use { client ->
         println(client.getInfo())
         println(client.ping())
+        println(client.images.getImages())
     }
 }
