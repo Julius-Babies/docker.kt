@@ -1,4 +1,4 @@
-package api.info
+package es.jvbabi.docker.kt.api.info
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement

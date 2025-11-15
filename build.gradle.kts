@@ -1,35 +1,25 @@
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.kotlinxSerialization)
+
+    alias(libs.plugins.maven.publish)
 }
 
-group = "me.user"
-version = "1.0-SNAPSHOT"
+group = "io.github.julius-babies"
+version = System.getenv("VERSION")?.ifBlank { null } ?: "unspecified"
 
 repositories {
     mavenCentral()
 }
 
 kotlin {
-    val hostOs = System.getProperty("os.name")
-    val isArm64 = System.getProperty("os.arch") == "aarch64"
-    val isMingwX64 = hostOs.startsWith("Windows")
-    val nativeTarget = when {
-        hostOs == "Mac OS X" && isArm64 -> macosArm64("native")
-        hostOs == "Mac OS X" && !isArm64 -> macosX64("native")
-        hostOs == "Linux" && isArm64 -> linuxArm64("native")
-        hostOs == "Linux" && !isArm64 -> linuxX64("native")
-        isMingwX64 -> mingwX64("native")
-        else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
-    }
+    linuxX64()
+    linuxArm64()
+    macosX64()
+    macosArm64()
+    mingwX64()
 
-    nativeTarget.apply {
-        binaries {
-            executable {
-                entryPoint = "main"
-            }
-        }
-    }
+    applyDefaultHierarchyTemplate()
 
     sourceSets {
         nativeMain.dependencies {
@@ -37,13 +27,54 @@ kotlin {
 
             implementation(libs.ktor.network)
             implementation(libs.ktor.client.core)
-            implementation(libs.ktor.client.cio)
-            implementation(libs.ktor.client.darwin)
             implementation(libs.ktor.client.logging)
             implementation(libs.ktor.client.content.negotiation)
             implementation(libs.ktor.serialization.kotlinx.json)
+        }
 
-            implementation(libs.kotlin.table.tui)
+        macosMain.dependencies {
+            implementation(libs.ktor.client.darwin)
+        }
+
+        linuxMain.dependencies {
+            implementation(libs.ktor.client.curl)
+        }
+
+        mingwMain.dependencies {
+            implementation(libs.ktor.client.winhttp)
+        }
+    }
+}
+
+
+mavenPublishing {
+    publishToMavenCentral()
+    signAllPublications()
+    coordinates(project.group.toString(), project.name, project.version.toString())
+
+    pom {
+        name = "table-tui"
+        description = "Docker.kt Kotlin/Native library for interacting with the Docker API"
+        url = "https://github.com/Julius-Babies/docker.kt"
+
+        developers {
+            developer {
+                id = "julius-vincent-babies"
+                name = "Julius Vincent Babies"
+                email = "julvin.babies@gmail.com"
+                url = "https://github.com/Julius-Babies"
+            }
+        }
+
+        scm {
+            url = "https://github.com/Julius-Babies/docker.kt"
+        }
+
+        licenses {
+            license {
+                name = "The MIT License (MIT)"
+                url = "https://opensource.org/license/MIT"
+            }
         }
     }
 }

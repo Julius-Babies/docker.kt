@@ -1,4 +1,4 @@
-package api.image
+package es.jvbabi.docker.kt.api.image
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName

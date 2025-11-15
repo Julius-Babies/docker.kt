@@ -1,7 +1,7 @@
-package docker
+package es.jvbabi.docker.kt.docker
 
-import api.image.ImageApi
-import api.info.DockerInfo
+import es.jvbabi.docker.kt.api.image.ImageApi
+import es.jvbabi.docker.kt.api.info.DockerInfo
 import io.ktor.client.HttpClient
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -10,6 +10,8 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
+
+expect fun getHttpClient(): HttpClient
 
 class DockerClient: AutoCloseable {
     internal val socket = getHttpClient()

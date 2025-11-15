@@ -1,21 +1,24 @@
-package api.image
+package es.jvbabi.docker.kt.api.image
 
-import docker.DockerClient
+import es.jvbabi.docker.kt.docker.DockerClient
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.utils.io.*
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonClassDiscriminator
 
 class ImageApi internal constructor(private val client: DockerClient) {
+    @Suppress("unused")
     suspend fun getImages(): List<DockerImage> {
         val response = client.socket.get("/images/json")
         return response.body()
     }
 
+    @Suppress("unused")
     suspend fun pull(
         image: String,
         beforeDownload: (layerHashes: List<String>) -> Unit = {},
@@ -99,6 +102,7 @@ sealed class ImagePullStatus {
     data object Downloaded: ImagePullStatus()
 }
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 @JsonClassDiscriminator("status")
 sealed class DockerImagePullApiStatus {
