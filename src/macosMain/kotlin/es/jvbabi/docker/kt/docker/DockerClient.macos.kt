@@ -2,7 +2,7 @@ package es.jvbabi.docker.kt.docker
 
 
 import io.ktor.client.*
-import io.ktor.client.engine.darwin.*
+import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
@@ -10,7 +10,7 @@ import kotlinx.serialization.json.Json
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.seconds
 
-actual fun getHttpClient() = HttpClient(Darwin) {
+actual fun getHttpClient() = HttpClient(CIO) {
     expectSuccess = true
 
     defaultRequest {
