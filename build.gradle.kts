@@ -35,6 +35,7 @@ kotlin {
         nativeMain.dependencies {
             implementation(libs.kotlinxSerializationJson)
 
+            implementation(libs.ktor.network)
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.cio)
             implementation(libs.ktor.client.logging)
