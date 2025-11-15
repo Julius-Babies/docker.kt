@@ -4,9 +4,12 @@ package docker
 
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
+import io.ktor.serialization.kotlinx.json.json
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.toKString
+import kotlinx.serialization.json.Json
 import platform.posix.F_OK
 import platform.posix.access
 import platform.posix.getenv
@@ -31,6 +34,14 @@ fun getHttpClient(): HttpClient {
 
         defaultRequest {
             unixSocket(getSocketPath())
+        }
+
+        install(ContentNegotiation) {
+            json(Json {
+                ignoreUnknownKeys = false
+                isLenient = true
+                prettyPrint = true
+            })
         }
     }
 

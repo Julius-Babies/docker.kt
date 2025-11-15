@@ -1,12 +1,11 @@
-import docker.getHttpClient
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
+import docker.DockerClient
 import kotlinx.coroutines.runBlocking
 
 fun main() = runBlocking {
     println("Hello, Kotlin/Native!")
-    val client = getHttpClient()
-    val dockerInfoResponse = client.get("/info")
+    val client = DockerClient()
 
-    println("Docker Info Response: ${dockerInfoResponse.bodyAsText()}")
+    client.use { client ->
+        println(client.getInfo())
+    }
 }
