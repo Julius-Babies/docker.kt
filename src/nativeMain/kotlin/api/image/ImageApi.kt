@@ -29,9 +29,7 @@ class ImageApi internal constructor(private val client: DockerClient) {
             parameters.append("tag", tagFromImage(image))
         }
 
-        val STAGE_FINDING_LAYERS = 0
-
-        var currentStage = STAGE_FINDING_LAYERS
+        var hasFoundAllLayers = false
 
         val json = Json { ignoreUnknownKeys = true }
         val layerIds = mutableListOf<String>()
@@ -42,14 +40,13 @@ class ImageApi internal constructor(private val client: DockerClient) {
             while (!channel.isClosedForRead) {
                 val line: String? = channel.readUTF8Line()
                 if (line != null) {
-//                    println(line)
                     try {
                         val status = json.decodeFromString<DockerImagePullApiStatus>(line)
                         if (status is DockerImagePullApiStatus.PullingFsLayer) {
                             layerIds.add(status.id)
                         } else {
-                            if (currentStage == STAGE_FINDING_LAYERS) {
-                                currentStage += 1
+                            if (!hasFoundAllLayers) {
+                                hasFoundAllLayers = true
                                 beforeDownload(layerIds)
                             }
 
