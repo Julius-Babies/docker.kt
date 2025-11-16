@@ -3,6 +3,9 @@ plugins {
     alias(libs.plugins.kotlinxSerialization)
 
     alias(libs.plugins.maven.publish)
+
+    alias(libs.plugins.kotest)
+    alias(libs.plugins.ksp)
 }
 
 group = "io.github.julius-babies"
@@ -43,6 +46,11 @@ kotlin {
 
         mingwMain.dependencies {
             implementation(libs.ktor.client.winhttp)
+        }
+
+        nativeTest.dependencies {
+            implementation(libs.kotest.framework.engine)
+            implementation(libs.kotest.assertions.core)
         }
     }
 }
