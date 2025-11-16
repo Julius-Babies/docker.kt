@@ -27,7 +27,7 @@ data class DockerImage(
     val sharedSize: Long,
 
     @SerialName("Labels")
-    val labels: Map<String, String>,
+    val labels: Map<String, String>? = null,
 
     @SerialName("Containers")
     val containers: Int,
