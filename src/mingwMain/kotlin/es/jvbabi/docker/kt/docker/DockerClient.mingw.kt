@@ -19,7 +19,7 @@ actual fun getHttpClient() = HttpClient(CIO) {
 
     install(ContentNegotiation) {
         json(Json {
-            ignoreUnknownKeys = false
+            ignoreUnknownKeys = true
             isLenient = true
             prettyPrint = true
         })
