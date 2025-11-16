@@ -5,35 +5,35 @@ import kotlinx.serialization.SerialName
 
 @Serializable
 data class DockerImage(
-    @SerialName("Containers")
-    val containers: Int,
-
-    @SerialName("Created")
-    val created: Long,
-
     @SerialName("Id")
     val id: String,
-
-    @SerialName("Labels")
-    val labels: Map<String, String>? = null,
 
     @SerialName("ParentId")
     val parentId: String,
 
-    @SerialName("Descriptor")
-    val descriptor: Descriptor,
+    @SerialName("RepoTags")
+    val repoTags: List<String>,
 
     @SerialName("RepoDigests")
     val repoDigests: List<String>,
 
-    @SerialName("RepoTags")
-    val repoTags: List<String>,
+    @SerialName("Created")
+    val created: Long,
+
+    @SerialName("Size")
+    val size: Long,
 
     @SerialName("SharedSize")
     val sharedSize: Long,
 
-    @SerialName("Size")
-    val size: Long
+    @SerialName("Labels")
+    val labels: Map<String, String>,
+
+    @SerialName("Containers")
+    val containers: Int,
+
+    @SerialName("Descriptor")
+    val descriptor: Descriptor? = null,
 )
 
 @Serializable
@@ -45,5 +45,8 @@ data class Descriptor(
     val digest: String,
 
     @SerialName("size")
-    val size: Long
+    val size: Long,
+
+    @SerialName("urls")
+    val urls: List<String> = emptyList()
 )
