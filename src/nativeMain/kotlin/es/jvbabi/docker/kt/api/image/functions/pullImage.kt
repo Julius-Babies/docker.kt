@@ -25,7 +25,7 @@ internal suspend fun pullImage(
     image: String,
     beforeDownload: (layerHashes: List<String>) -> Unit = {},
     onDownload: (layerHash: String, status: ImagePullStatus) -> Unit,
-    debugLogs: Boolean = false
+    debugLogs: Boolean
 ) {
     val url = URLBuilder().apply {
         protocol = URLProtocol.HTTP

@@ -16,8 +16,9 @@ class ImageApi internal constructor(private val client: DockerClient) {
     suspend fun pull(
         image: String,
         beforeDownload: (layerHashes: List<String>) -> Unit = {},
-        onDownload: (layerHash: String, status: ImagePullStatus) -> Unit
-    ) = pullImage(client, image, beforeDownload, onDownload)
+        onDownload: (layerHash: String, status: ImagePullStatus) -> Unit,
+        debugLogs: Boolean = false
+    ) = pullImage(client, image, beforeDownload, onDownload, debugLogs)
 
     @Suppress("unused")
     suspend fun removeImage(
