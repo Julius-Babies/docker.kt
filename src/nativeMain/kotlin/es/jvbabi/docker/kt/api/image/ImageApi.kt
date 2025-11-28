@@ -1,87 +1,32 @@
 package es.jvbabi.docker.kt.api.image
 
+import es.jvbabi.docker.kt.api.image.api.DockerImage
+import es.jvbabi.docker.kt.api.image.functions.getImages
+import es.jvbabi.docker.kt.api.image.functions.pullImage
 import es.jvbabi.docker.kt.docker.DockerClient
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.http.*
-import io.ktor.utils.io.*
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonClassDiscriminator
 
 class ImageApi internal constructor(private val client: DockerClient) {
     @Suppress("unused")
-    suspend fun getImages(): List<DockerImage> {
-        val response = client.socket.get("/images/json")
-        return response.body()
-    }
+    suspend fun getImages(): List<DockerImage> = getImages(client)
 
     @Suppress("unused")
     suspend fun pull(
         image: String,
         beforeDownload: (layerHashes: List<String>) -> Unit = {},
         onDownload: (layerHash: String, status: ImagePullStatus) -> Unit
-    ) {
-        val url = URLBuilder().apply {
-            protocol = URLProtocol.HTTP
-            host = "localhost"
-            pathSegments = listOf("images", "create")
-            parameters.append("fromImage", repositoryFromImage(image))
-            parameters.append("tag", tagFromImage(image))
-        }
+    ) = pullImage(client, image, beforeDownload, onDownload)
 
-        var hasFoundAllLayers = false
-
-        val json = Json { ignoreUnknownKeys = true }
-        val layerIds = mutableListOf<String>()
-
-        client.socket.preparePost(url.build()).execute { response ->
-            val channel: ByteReadChannel = response.body()
-
-            while (!channel.isClosedForRead) {
-                val line: String? = channel.readUTF8Line()
-                if (line != null) {
-                    try {
-                        val status = json.decodeFromString<DockerImagePullApiStatus>(line)
-                        if (status is DockerImagePullApiStatus.PullingFsLayer) {
-                            layerIds.add(status.id)
-                        } else {
-                            if (!hasFoundAllLayers) {
-                                hasFoundAllLayers = true
-                                beforeDownload(layerIds)
-                            }
-
-                            when (status) {
-                                is DockerImagePullApiStatus.Downloading -> {
-                                    onDownload(status.id, ImagePullStatus.Pulling(status.progressDetail.total, status.progressDetail.current))
-                                }
-                                is DockerImagePullApiStatus.DownloadComplete -> {
-                                    onDownload(status.id, ImagePullStatus.Downloaded)
-                                }
-                                is DockerImagePullApiStatus.Extracting -> {
-                                    onDownload(
-                                        status.id,
-                                        ImagePullStatus.Extracting(
-                                            status.id,
-                                            status.progressDetail.current,
-                                            status.progressDetail.unit
-                                        )
-                                    )
-                                }
-                                else -> {}
-                            }
-                        }
-                    } catch (e: Exception) {
-                        if (e.message?.contains("is not found in the polymorphic scope") != true) {
-                            throw e
-                        }
-                    }
-                }
-            }
-        }
-    }
+    @Suppress("unused")
+    suspend fun removeImage(
+        image: String,
+        force: Boolean = false,
+        deleteUntaggedParents: Boolean = true
+    ): List<ImageRemoveStatus> = es.jvbabi.docker.kt.api.image.functions.removeImage(
+        client = client,
+        image = image,
+        force = force,
+        deleteUntaggedParents = deleteUntaggedParents
+    )
 
     companion object {
         fun repositoryFromImage(image: String): String {
@@ -94,53 +39,4 @@ class ImageApi internal constructor(private val client: DockerClient) {
             return image.substringAfter(":", "latest")
         }
     }
-}
-
-sealed class ImagePullStatus {
-    data class Pulling(val bytesTotal: Long, val bytesPulled: Long): ImagePullStatus()
-    data class Extracting(val layerHash: String, val current: Long, val unit: String): ImagePullStatus()
-    data object Downloaded: ImagePullStatus()
-}
-
-@OptIn(ExperimentalSerializationApi::class)
-@Serializable
-@JsonClassDiscriminator("status")
-sealed class DockerImagePullApiStatus {
-    @Serializable
-    @SerialName("Pulling fs layer")
-    data class PullingFsLayer(
-        @SerialName("id") val id: String
-    ) : DockerImagePullApiStatus()
-
-    @Serializable
-    @SerialName("Downloading")
-    data class Downloading(
-        @SerialName("id") val id: String,
-        @SerialName("progressDetail") val progressDetail: ProgressDetail
-    ): DockerImagePullApiStatus() {
-        @Serializable
-        data class ProgressDetail(
-            @SerialName("current") val current: Long,
-            @SerialName("total") val total: Long
-        )
-    }
-
-    @Serializable
-    @SerialName("Extracting")
-    data class Extracting(
-        @SerialName("id") val id: String,
-        @SerialName("progressDetail") val progressDetail: ProgressDetail
-    ): DockerImagePullApiStatus() {
-        @Serializable
-        data class ProgressDetail(
-            @SerialName("current") val current: Long,
-            @SerialName("units") val unit: String
-        )
-    }
-
-    @Serializable
-    @SerialName("Download complete")
-    data class DownloadComplete(
-        @SerialName("id") val id: String
-    ): DockerImagePullApiStatus()
 }

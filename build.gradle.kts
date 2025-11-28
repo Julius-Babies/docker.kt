@@ -58,11 +58,13 @@ kotlin {
 
 mavenPublishing {
     publishToMavenCentral()
-    signAllPublications()
+    if (!gradle.startParameter.taskNames.any { it.contains("publishToMavenLocal") }) {
+        signAllPublications()
+    }
     coordinates(project.group.toString(), project.name, project.version.toString())
 
     pom {
-        name = "table-tui"
+        name = "docker.kt"
         description = "Docker.kt Kotlin/Native library for interacting with the Docker API"
         url = "https://github.com/Julius-Babies/docker.kt"
 
