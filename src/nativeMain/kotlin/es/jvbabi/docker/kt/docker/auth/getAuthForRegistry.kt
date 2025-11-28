@@ -31,7 +31,6 @@ fun getAuthForRegistry(registry: String): String? {
                 .spawn()
             val stdin = command.bufferedStdin()!!
             stdin.writeLine(registry)
-            stdin.close()
             command.waitWithOutput()
             val authString = command.bufferedStdout()!!.readAll()!!
             val authResponseObject = json.decodeFromString<DockerCredentialDesktopResponse>(authString)
