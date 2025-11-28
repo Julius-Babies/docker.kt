@@ -10,6 +10,9 @@ class ImageApi internal constructor(private val client: DockerClient) {
     suspend fun getImages(): List<DockerImage> = getImages(client)
 
     @Suppress("unused")
+    /**
+     * @throws RegistryNotAuthorizedException if the image is from a registry that requires authentication
+     */
     suspend fun pull(
         image: String,
         beforeDownload: (layerHashes: List<String>) -> Unit = {},
@@ -29,6 +32,16 @@ class ImageApi internal constructor(private val client: DockerClient) {
     )
 
     companion object {
+        fun registryFromImage(image: String): String {
+            val parts = image.split("/")
+
+            return if (parts.size == 1 || (!parts[0].contains('.') && parts[0] != "localhost")) {
+                "docker.io"
+            } else {
+                parts[0]
+            }
+        }
+
         fun repositoryFromImage(image: String): String {
             val imageWithoutTag = image.substringBefore(":")
             if (imageWithoutTag.contains("/")) return imageWithoutTag
@@ -40,3 +53,5 @@ class ImageApi internal constructor(private val client: DockerClient) {
         }
     }
 }
+
+class RegistryNotAuthorizedException(val registry: String): Exception("Not authorized for registry $registry")

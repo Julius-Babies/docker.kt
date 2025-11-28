@@ -1,23 +1,31 @@
 package es.jvbabi.docker.kt.api.image.functions
 
+import es.jvbabi.docker.kt.api.image.ImageApi
 import es.jvbabi.docker.kt.api.image.ImageApi.Companion.repositoryFromImage
 import es.jvbabi.docker.kt.api.image.ImageApi.Companion.tagFromImage
 import es.jvbabi.docker.kt.api.image.ImagePullStatus
+import es.jvbabi.docker.kt.api.image.RegistryNotAuthorizedException
 import es.jvbabi.docker.kt.api.image.api.DockerImagePullApiStatus
 import es.jvbabi.docker.kt.docker.DockerClient
+import es.jvbabi.docker.kt.docker.auth.getAuthForRegistry
 import io.ktor.client.call.body
+import io.ktor.client.request.header
 import io.ktor.client.request.preparePost
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.URLBuilder
 import io.ktor.http.URLProtocol
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.readUTF8Line
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 internal suspend fun pullImage(
     dockerClient: DockerClient,
     image: String,
     beforeDownload: (layerHashes: List<String>) -> Unit = {},
-    onDownload: (layerHash: String, status: ImagePullStatus) -> Unit
+    onDownload: (layerHash: String, status: ImagePullStatus) -> Unit,
+    debugLogs: Boolean = false
 ) {
     val url = URLBuilder().apply {
         protocol = URLProtocol.HTTP
@@ -27,12 +35,24 @@ internal suspend fun pullImage(
         parameters.append("tag", tagFromImage(image))
     }
 
+    val registry = ImageApi.registryFromImage(image)
+    val auth = getAuthForRegistry(registry)
+    if (debugLogs) println("Auth for $registry: $auth")
+
     var hasFoundAllLayers = false
 
     val json = Json { ignoreUnknownKeys = true }
     val layerIds = mutableListOf<String>()
 
-    dockerClient.socket.preparePost(url.build()).execute { response ->
+    dockerClient.socket.preparePost(url.build()) {
+        if (auth != null) header("X-Registry-Auth", auth)
+    }.execute { response ->
+        if (response.status == HttpStatusCode.Forbidden) {
+            val data = response.body<DockerImagePullError>()
+            if (data.message == "error from registry: access forbidden") throw RegistryNotAuthorizedException(registry)
+            throw RuntimeException(data.message)
+        }
+
         val channel: ByteReadChannel = response.body()
 
         while (!channel.isClosedForRead) {
@@ -77,3 +97,8 @@ internal suspend fun pullImage(
         }
     }
 }
+
+@Serializable
+data class DockerImagePullError(
+    @SerialName("message") val message: String
+)
