@@ -15,6 +15,6 @@ data class DockerConfig(
 
     @Serializable
     data class Auth(
-        @SerialName("auth") val auth: String
+        @SerialName("auth") val auth: String? = null
     )
 }
