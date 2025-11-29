@@ -2,6 +2,7 @@ package es.jvbabi.docker.kt.docker
 
 import es.jvbabi.docker.kt.api.image.ImageApi
 import es.jvbabi.docker.kt.api.info.DockerInfo
+import es.jvbabi.docker.kt.api.network.NetworkApi
 import io.ktor.client.HttpClient
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -26,6 +27,7 @@ class DockerClient: AutoCloseable {
     }
 
     val images = ImageApi(this)
+    val networks = NetworkApi(this)
 
     suspend fun getInfo(): DockerInfo {
         val response = socket.get("/info")
