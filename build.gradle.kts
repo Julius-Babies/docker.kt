@@ -56,6 +56,10 @@ kotlin {
             implementation(libs.kotest.assertions.core)
         }
     }
+
+    compilerOptions {
+        optIn.add("kotlin.time.ExperimentalTime")
+    }
 }
 
 
