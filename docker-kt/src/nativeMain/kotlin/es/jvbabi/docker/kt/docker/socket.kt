@@ -10,7 +10,7 @@ fun getSocketPath(): String {
     val socketOptions = listOf(
         File("/var/run/docker.sock"),
         File.getUserHomeDirectory().resolve(".docker").resolve("run").resolve("docker.sock"),
-        File.getUserHomeDirectory().resolve(".colima").resolve("docker.sock"),
+        File.getUserHomeDirectory().resolve(".colima").resolve("default").resolve("docker.sock"),
     )
     val path = socketOptions.firstOrNull { it.exists() }
     if (path != null) return path.absolutePath
