@@ -44,10 +44,11 @@ internal suspend fun createContainer(
     exposedPorts: List<Int> = emptyList()
 ) {
     val binds = volumeBinds.map { (bind, containerPath) ->
-        when (bind) {
+        val mountPath = when (bind) {
             is VolumeBind.Host -> "${bind.path}:$containerPath"
             is VolumeBind.Volume -> "${bind.name}:$containerPath"
         }
+        if (bind.readOnly) "$mountPath:ro" else mountPath
     }
 
     val envList = environment.map { (k, v) -> "$k=$v" }

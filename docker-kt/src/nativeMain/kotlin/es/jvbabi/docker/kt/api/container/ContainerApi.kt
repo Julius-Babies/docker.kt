@@ -66,6 +66,15 @@ class ContainerApi internal constructor(private val client: DockerClient) {
 }
 
 sealed class VolumeBind {
-    data class Host(val path: String) : VolumeBind()
-    data class Volume(val name: String): VolumeBind()
+    abstract val readOnly: Boolean
+
+    data class Host(
+        val path: String,
+        override val readOnly: Boolean = false
+    ) : VolumeBind()
+
+    data class Volume(
+        val name: String,
+        override val readOnly: Boolean = false
+    ) : VolumeBind()
 }
