@@ -77,4 +77,20 @@ sealed class VolumeBind {
         val name: String,
         override val readOnly: Boolean = false
     ) : VolumeBind()
+
+    companion object {
+        fun from(input: String): Pair<VolumeBind, String> {
+            when (input.count { it == ':' }) {
+                1 -> {
+                    val (host, container) = input.split(":")
+                    return Host(host, false) to container
+                }
+                2 -> {
+                    val (host, container, readOnly) = input.split(":")
+                    return Host(host, readOnly.lowercase() == "ro") to container
+                }
+                else -> error("Invalid volume bind: $input")
+            }
+        }
+    }
 }
