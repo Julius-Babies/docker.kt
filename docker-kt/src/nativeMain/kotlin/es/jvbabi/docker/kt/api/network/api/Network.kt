@@ -19,11 +19,11 @@ data class Network(
 ) {
     data class Ipam(
         val driver: String,
-        val configs: List<IpamConfig>
+        val configs: List<IpamConfig>?
     ) {
         data class IpamConfig(
             val subnet: String,
-            val ipRange: String,
+            val ipRange: String?,
             val gateway: String,
             val auxAddress: Map<String, String>
         )

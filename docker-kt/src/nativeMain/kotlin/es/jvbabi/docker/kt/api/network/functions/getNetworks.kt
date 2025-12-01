@@ -22,21 +22,21 @@ data class DockerNetworksResponse(
     @SerialName("EnableIPv4") val enableIPv4: Boolean,
     @SerialName("Internal") val internal: Boolean,
     @SerialName("Attachable") val attachable: Boolean,
-    @SerialName("IPAM") val ipam: Ipam?,
+    @SerialName("IPAM") val ipam: Ipam,
     @SerialName("Labels") val labels: Map<String, String> = emptyMap(),
-    @SerialName("CreatedAt") val createdAt: String
+    @SerialName("Created") val createdAt: String
 ) {
     @Serializable
     data class Ipam(
         @SerialName("Driver") val driver: String,
-        @SerialName("Config") val configs: List<IpamConfig>
+        @SerialName("Config") val configs: List<IpamConfig>?
     ) {
         @Serializable
         data class IpamConfig(
             @SerialName("Subnet") val subnet: String,
             @SerialName("Gateway") val gateway: String,
             @SerialName("AuxiliaryAddresses") val auxiliaryAddresses: Map<String, String> = emptyMap(),
-            @SerialName("IPRange") val ipRange: String
+            @SerialName("IPRange") val ipRange: String? = null
         )
     }
 }
@@ -64,22 +64,24 @@ suspend fun internalGetNetworksRequest(dockerClient: DockerClient): List<Network
                 "bridge" -> NetworkDriver.Bridge
                 "overlay" -> NetworkDriver.Overlay
                 "host" -> NetworkDriver.Host
+                "null" -> NetworkDriver.Null
                 else -> throw RuntimeException("Unknown network driver: ${network.driver}")
             },
             enableIPv4 = network.enableIPv4,
             enableIPv6 = network.enableIPv6,
             internal = network.internal,
             attachable = network.attachable,
-            ipam = network.ipam?.let { ipam ->
-                Network.Ipam(ipam.driver, ipam.configs.map { config ->
+            ipam = Network.Ipam(
+                driver = network.ipam.driver,
+                configs = network.ipam.configs?.map { config ->
                     Network.Ipam.IpamConfig(
                         subnet = config.subnet,
                         ipRange = config.ipRange,
                         gateway = config.gateway,
                         auxAddress = config.auxiliaryAddresses
                     )
-                })
-            },
+                }
+            ),
             labels = network.labels,
             created = Instant.parse(network.createdAt)
         )

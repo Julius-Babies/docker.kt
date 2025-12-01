@@ -21,6 +21,7 @@ class DockerClient: AutoCloseable {
                 ignoreUnknownKeys = true
                 isLenient = true
                 prettyPrint = true
+                encodeDefaults = false
             })
         }
     }

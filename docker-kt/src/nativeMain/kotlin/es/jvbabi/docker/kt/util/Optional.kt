@@ -1,8 +1,11 @@
 package es.jvbabi.docker.kt.util
 
+import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.SerialKind
+import kotlinx.serialization.descriptors.buildSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlin.contracts.ExperimentalContracts
@@ -23,12 +26,13 @@ internal fun <T> Optional<T>.isDefined(): Boolean {
 }
 
 internal class OptionalSerializer<T>(private val serializer: KSerializer<T>) : KSerializer<Optional<T>> {
-    override val descriptor: SerialDescriptor = serializer.descriptor
+    @OptIn(InternalSerializationApi::class)
+    override val descriptor: SerialDescriptor = buildSerialDescriptor("Optional", SerialKind.CONTEXTUAL)
 
     override fun serialize(encoder: Encoder, value: Optional<T>) {
         when (value) {
             is Optional.Defined -> encoder.encodeSerializableValue(serializer, value.value)
-            is Optional.Undefined -> {} // Do nothing if Undefined
+            is Optional.Undefined -> {}
         }
     }
 

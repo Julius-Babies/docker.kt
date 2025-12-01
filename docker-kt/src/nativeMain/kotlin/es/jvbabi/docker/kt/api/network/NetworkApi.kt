@@ -2,6 +2,7 @@ package es.jvbabi.docker.kt.api.network
 
 import es.jvbabi.docker.kt.api.network.api.Network
 import es.jvbabi.docker.kt.api.network.functions.internalCreateNetworkRequest
+import es.jvbabi.docker.kt.api.network.functions.internalDeleteNetworkRequest
 import es.jvbabi.docker.kt.api.network.functions.internalGetNetworksRequest
 import es.jvbabi.docker.kt.docker.DockerClient
 
@@ -37,4 +38,7 @@ class NetworkApi internal constructor(private val client: DockerClient) {
 
     suspend fun getNetworks(): List<Network> =
         internalGetNetworksRequest(client)
+
+    suspend fun removeNetwork(id: String) =
+        internalDeleteNetworkRequest(client, id)
 }

@@ -18,7 +18,7 @@ internal data class CreateNetworkRequest(
     @SerialName("Scope") val scope: String,
     @SerialName("Internal") val internal: Boolean,
     @SerialName("Attachable") val attachable: Boolean,
-    @SerialName("IPAM") val ipamConfig: Optional<IpamConfig>,
+    @SerialName("IPAM") val ipamConfig: Optional<IpamConfig> = Optional.Undefined,
     @SerialName("EnableIPv6") val enableIPv6: Boolean,
     @SerialName("EnableIPv4") val enableIPv4: Boolean,
     @SerialName("Labels") val labels: Map<String, String>
@@ -56,6 +56,7 @@ internal suspend fun internalCreateNetworkRequest(
             NetworkDriver.Bridge -> "bridge"
             NetworkDriver.Overlay -> "overlay"
             NetworkDriver.Host -> "host"
+            NetworkDriver.Null -> "null"
         },
         scope = when (scope) {
             NetworkScope.Local -> "local"
