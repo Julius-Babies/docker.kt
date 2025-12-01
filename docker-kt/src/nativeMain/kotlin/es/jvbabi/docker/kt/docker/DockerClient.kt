@@ -3,13 +3,12 @@ package es.jvbabi.docker.kt.docker
 import es.jvbabi.docker.kt.api.image.ImageApi
 import es.jvbabi.docker.kt.api.info.DockerInfo
 import es.jvbabi.docker.kt.api.network.NetworkApi
-import io.ktor.client.HttpClient
+import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
-import io.ktor.client.statement.bodyAsText
-import io.ktor.http.isSuccess
-import io.ktor.serialization.kotlinx.json.json
+import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 
 expect fun getHttpClient(): HttpClient
@@ -31,7 +30,6 @@ class DockerClient: AutoCloseable {
 
     suspend fun getInfo(): DockerInfo {
         val response = socket.get("/info")
-        println(response.bodyAsText())
         return response.body()
     }
 
