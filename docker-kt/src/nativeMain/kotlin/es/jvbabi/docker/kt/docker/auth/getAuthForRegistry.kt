@@ -22,22 +22,32 @@ fun getAuthForRegistry(registry: String): String? {
             val auth = dockerConfig.auths?.get(registry) ?: return null
             return auth.auth
         }
-        DockerConfig.CredsStore.Desktop -> {
-            val command = Command("docker-credential-desktop")
-                .args("get")
-                .stdin(Stdio.Pipe)
-                .stdout(Stdio.Pipe)
-                .stderr(Stdio.Pipe)
-                .spawn()
-            val stdin = command.bufferedStdin()!!
-            stdin.writeLine(registry)
-            val out = command.waitWithOutput()
-            val authString = out.stdout!!
-            val authResponseObject = json.decodeFromString<DockerCredentialDesktopResponse>(authString)
-            return json.encodeToString<Auth>(Auth(authResponseObject.username, authResponseObject.secret))
-                .let { Base64.encode(it.toByteArray()) }
-        }
+        DockerConfig.CredsStore.Desktop -> return defaultInternalCredentialStore("docker-credential-desktop", registry)
+        DockerConfig.CredsStore.OSXKeychain -> return defaultInternalCredentialStore("docker-credential-osxkeychain", registry)
     }
+}
+
+private val noCredentialsFound = listOf(
+    "credentials not found in native keychain"
+)
+
+private fun defaultInternalCredentialStore(command: String, registry: String): String? {
+    val command = Command(command)
+        .args("get")
+        .stdin(Stdio.Pipe)
+        .stdout(Stdio.Pipe)
+        .stderr(Stdio.Pipe)
+        .spawn()
+    val stdin = command.bufferedStdin()!!
+    stdin.writeLine(registry)
+    val out = command.waitWithOutput()
+    val authString = out.stdout!!
+        .lines()
+        .firstOrNull() ?: return null
+    if (authString.lowercase() in noCredentialsFound) return null
+    val authResponseObject = json.decodeFromString<DockerCredentialDesktopResponse>(authString)
+    return json.encodeToString<Auth>(Auth(authResponseObject.username, authResponseObject.secret))
+        .let { Base64.encode(it.toByteArray()) }
 }
 
 @Serializable

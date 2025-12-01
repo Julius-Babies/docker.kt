@@ -10,7 +10,8 @@ data class DockerConfig(
 ) {
     @Serializable
     enum class CredsStore {
-        @SerialName("desktop") Desktop
+        @SerialName("desktop") Desktop,
+        @SerialName("osxkeychain") OSXKeychain,
     }
 
     @Serializable

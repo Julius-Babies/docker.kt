@@ -1,4 +1,5 @@
 import es.jvbabi.docker.kt.docker.DockerClient
+import es.jvbabi.docker.kt.docker.auth.getAuthForRegistry
 import kotlinx.coroutines.runBlocking
 
 fun main() {
@@ -6,6 +7,8 @@ fun main() {
         DockerClient().use { dockerClient ->
             println("=== Docker Info ===")
             println(dockerClient.getInfo())
+
+            println(getAuthForRegistry("registry.gitlfab.jvbabi.es"))
 
             println("\n=== Networks ===")
             val networks = dockerClient.networks.getNetworks()
