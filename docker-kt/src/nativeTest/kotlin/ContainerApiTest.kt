@@ -227,7 +227,7 @@ class ContainerApiTest : FunSpec({
             println("Running containers: ${runningContainers.size}")
 
             runningContainers.forEach { container ->
-                container.state shouldBe "running"
+                container.state shouldBe ContainerState.RUNNING
             }
         }
     }

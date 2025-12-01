@@ -20,19 +20,36 @@ class ContainerApi internal constructor(private val client: DockerClient) {
      * @return A list of [DockerContainer] objects representing the containers.
      */
     suspend fun getContainers(all: Boolean = false): List<DockerContainer> = getContainers(client, all)
+
+    /**
+     * Creates a new container.
+     *
+     * @param image The image to use for the container (e.g., "nginx:latest")
+     * @param name Optional name for the container
+     * @param volumeBinds Map of volume bindings: [VolumeBind] to container path
+     * @param environment Map of environment variables: key to value
+     * @param labels Map of labels: key to value
+     * @param ports Map of port mappings: container port to host port (e.g., 80 to 8080)
+     * @param exposedPorts List of ports to expose without host binding
+     * @throws es.jvbabi.docker.kt.api.image.ImageNotFoundException if the specified image does not exist
+     */
     suspend fun createContainer(
         image: String,
         name: String? = null,
         volumeBinds: Map<VolumeBind, String> = emptyMap(),
         environment: Map<String, String> = emptyMap(),
-        labels: Map<String, String> = emptyMap()
+        labels: Map<String, String> = emptyMap(),
+        ports: Map<Int, Int> = emptyMap(),
+        exposedPorts: List<Int> = emptyList()
     ) = createContainer(
         dockerClient = client,
         image = image,
         name = name,
         volumeBinds = volumeBinds,
         environment = environment,
-        labels = labels
+        labels = labels,
+        ports = ports,
+        exposedPorts = exposedPorts
     )
 
     suspend fun startContainer(id: String) = startContainer(client, id)
