@@ -31,7 +31,7 @@ data class DockerContainer(
     val status: String,
 
     @SerialName("Ports")
-    val ports: List<Port> = emptyList(),
+    val ports: List<Port>? = emptyList(),
 
     @SerialName("Labels")
     val labels: Map<String, String> = emptyMap(),
