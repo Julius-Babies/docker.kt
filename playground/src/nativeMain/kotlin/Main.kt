@@ -3,7 +3,6 @@ import es.jvbabi.docker.kt.docker.DockerClient
 import es.jvbabi.docker.kt.docker.auth.getAuthForRegistry
 import es.jvbabi.docker.kt.docker.getSocketPath
 import kotlinx.coroutines.runBlocking
-import kotlin.native.internal.collectReferenceFieldValues
 
 fun main() {
     runBlocking {
@@ -38,6 +37,8 @@ fun main() {
             // start test container
             dockerClient.containers.startContainer(containerId!!)
 
+            val r = dockerClient.containers.runCommand(containerId, listOf("ls", "-lah", "/"))
+            println(r.output)
 
             containers.forEach { container ->
                 println("  - ${container.names.firstOrNull()} | ${container.state} | ${container.image}")

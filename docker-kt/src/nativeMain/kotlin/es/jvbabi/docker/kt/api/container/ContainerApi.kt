@@ -7,7 +7,8 @@ import es.jvbabi.docker.kt.api.container.functions.getContainers
 import es.jvbabi.docker.kt.api.container.functions.killContainer
 import es.jvbabi.docker.kt.api.container.functions.pauseContainer
 import es.jvbabi.docker.kt.api.container.functions.restartContainer
-import es.jvbabi.docker.kt.api.container.functions.startContainer
+import es.jvbabi.docker.kt.api.container.functions.runCommandInternalSimple
+import es.jvbabi.docker.kt.api.container.functions.startContainerInternal
 import es.jvbabi.docker.kt.api.container.functions.stopContainer
 import es.jvbabi.docker.kt.docker.DockerClient
 
@@ -52,7 +53,14 @@ class ContainerApi internal constructor(private val client: DockerClient) {
         exposedPorts = exposedPorts
     )
 
-    suspend fun startContainer(id: String) = startContainer(client, id)
+    /**
+     * Starts a container.
+     * @param containerId The ID of the container to start
+     * @param exceptionOnAlreadyRunning If true, throws an exception if the container is already running
+     * @throws ContainerAlreadyRunningException if the container is already running and if [exceptionOnAlreadyRunning] is true
+     */
+    suspend fun startContainer(containerId: String, exceptionOnAlreadyRunning: Boolean = false) =
+        startContainerInternal(client, containerId, exceptionOnAlreadyRunning)
 
     suspend fun stopContainer(id: String) = stopContainer(client, id)
 
@@ -63,7 +71,12 @@ class ContainerApi internal constructor(private val client: DockerClient) {
     suspend fun pauseContainer(id: String) = pauseContainer(client, id)
 
     suspend fun deleteContainer(id: String) = deleteContainer(client, id)
+
+    suspend fun runCommand(id: String, command: List<String>): CommandResult =
+        runCommandInternalSimple(client, id, command)
 }
+
+data class CommandResult(val exitCode: Int, val output: String)
 
 sealed class VolumeBind {
     abstract val readOnly: Boolean
@@ -94,3 +107,5 @@ sealed class VolumeBind {
         }
     }
 }
+
+class ContainerAlreadyRunningException(val id: String): Exception("Container $id is already running")
