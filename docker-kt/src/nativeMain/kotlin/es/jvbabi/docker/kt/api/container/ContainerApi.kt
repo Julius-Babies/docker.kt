@@ -1,7 +1,7 @@
 package es.jvbabi.docker.kt.api.container
 
 import es.jvbabi.docker.kt.api.container.api.DockerContainer
-import es.jvbabi.docker.kt.api.container.functions.createContainer
+import es.jvbabi.docker.kt.api.container.functions.createContainerInternal
 import es.jvbabi.docker.kt.api.container.functions.deleteContainer
 import es.jvbabi.docker.kt.api.container.functions.getContainers
 import es.jvbabi.docker.kt.api.container.functions.killContainer
@@ -41,8 +41,9 @@ class ContainerApi internal constructor(private val client: DockerClient) {
         environment: Map<String, String> = emptyMap(),
         labels: Map<String, String> = emptyMap(),
         ports: Map<Int, Int> = emptyMap(),
-        exposedPorts: List<Int> = emptyList()
-    ) = createContainer(
+        exposedPorts: List<Int> = emptyList(),
+        networkConfigs: List<NetworkConfig> = emptyList()
+    ) = createContainerInternal(
         dockerClient = client,
         image = image,
         name = name,
@@ -50,7 +51,8 @@ class ContainerApi internal constructor(private val client: DockerClient) {
         environment = environment,
         labels = labels,
         ports = ports,
-        exposedPorts = exposedPorts
+        exposedPorts = exposedPorts,
+        networkConfigs = networkConfigs,
     )
 
     /**
@@ -116,5 +118,10 @@ sealed class VolumeBind {
         }
     }
 }
+
+data class NetworkConfig(
+    val networkId: String,
+    val aliases: List<String> = emptyList()
+)
 
 class ContainerAlreadyRunningException(val id: String): Exception("Container $id is already running")

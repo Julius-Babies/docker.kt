@@ -1,8 +1,9 @@
 package es.jvbabi.docker.kt.api.container.functions
 
+import es.jvbabi.docker.kt.api.container.NetworkConfig
 import es.jvbabi.docker.kt.api.container.VolumeBind
-import es.jvbabi.docker.kt.docker.DockerClient
 import es.jvbabi.docker.kt.api.image.ImageNotFoundException
+import es.jvbabi.docker.kt.docker.DockerClient
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -15,8 +16,19 @@ private data class CreateContainerRequest(
     @SerialName("HostConfig") val hostConfig: HostConfig = HostConfig(),
     @SerialName("Env") val env: List<String> = emptyList(),
     @SerialName("Labels") val labels: Map<String, String> = emptyMap(),
-    @SerialName("ExposedPorts") val exposedPorts: Map<String, EmptyObject> = emptyMap()
-)
+    @SerialName("ExposedPorts") val exposedPorts: Map<String, EmptyObject> = emptyMap(),
+    @SerialName("NetworkingConfig") val networkingConfig: NetworkingConfig
+) {
+    @Serializable
+    data class NetworkingConfig(
+        @SerialName("EndpointsConfig") val endpointsConfig: Map<String, EndpointConfig>
+    ) {
+        @Serializable
+        data class EndpointConfig(
+            @SerialName("Aliases") val aliases: List<String> = emptyList()
+        )
+    }
+}
 
 @Serializable
 private data class HostConfig(
@@ -33,7 +45,7 @@ private data class PortBinding(
 @Serializable
 private class EmptyObject
 
-internal suspend fun createContainer(
+internal suspend fun createContainerInternal(
     dockerClient: DockerClient,
     image: String,
     name: String? = null,
@@ -41,7 +53,8 @@ internal suspend fun createContainer(
     environment: Map<String, String> = emptyMap(),
     labels: Map<String, String> = emptyMap(),
     ports: Map<Int, Int> = emptyMap(),
-    exposedPorts: List<Int> = emptyList()
+    exposedPorts: List<Int> = emptyList(),
+    networkConfigs: List<NetworkConfig>,
 ) {
     val binds = volumeBinds.map { (bind, containerPath) ->
         val mountPath = when (bind) {
@@ -74,7 +87,12 @@ internal suspend fun createContainer(
         ),
         env = envList,
         labels = labels,
-        exposedPorts = allExposedPorts
+        exposedPorts = allExposedPorts,
+        networkingConfig = CreateContainerRequest.NetworkingConfig(networkConfigs.associate { networkConfig ->
+            networkConfig.networkId to CreateContainerRequest.NetworkingConfig.EndpointConfig(
+                aliases = networkConfig.aliases
+            )
+        })
     )
 
     val url = URLBuilder().apply {
