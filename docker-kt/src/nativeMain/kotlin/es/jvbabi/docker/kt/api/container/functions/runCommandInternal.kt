@@ -20,11 +20,17 @@ import kotlinx.serialization.Serializable
 internal suspend fun runCommandInternalSimple(
     dockerClient: DockerClient,
     containerId: String,
-    command: List<String>
+    command: List<String>,
+    environment: Map<String, String>,
 ): CommandResult {
     val createExecInstanceResponse = dockerClient.socket.post("/containers/$containerId/exec") {
         contentType(ContentType.Application.Json)
-        setBody(CreateExecInstanceRequest(attachStdout = true, attachStderr = true, cmd = command))
+        setBody(CreateExecInstanceRequest(
+            attachStdout = true,
+            attachStderr = true,
+            cmd = command,
+            env = environment.map { "${it.key}=${it.value}" }
+        ))
     }
     if (!createExecInstanceResponse.status.isSuccess()) throw RuntimeException("Failed to run command: ${createExecInstanceResponse.status.value} ${createExecInstanceResponse.bodyAsText()}")
     val execId = createExecInstanceResponse.body<CreateExecInstanceResponse>().id
@@ -76,7 +82,8 @@ internal suspend fun runCommandInternalSimple(
 data class CreateExecInstanceRequest(
     @SerialName("AttachStdout") val attachStdout: Boolean,
     @SerialName("AttachStderr") val attachStderr: Boolean,
-    @SerialName("Cmd") val cmd: List<String>
+    @SerialName("Cmd") val cmd: List<String>,
+    @SerialName("Env") val env: List<String>,
 )
 
 @Serializable

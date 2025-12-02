@@ -72,8 +72,17 @@ class ContainerApi internal constructor(private val client: DockerClient) {
 
     suspend fun deleteContainer(id: String) = deleteContainer(client, id)
 
-    suspend fun runCommand(id: String, command: List<String>): CommandResult =
-        runCommandInternalSimple(client, id, command)
+    suspend fun runCommand(
+        containerId: String,
+        command: List<String>,
+        environment: Map<String, String> = emptyMap(),
+    ): CommandResult =
+        runCommandInternalSimple(
+            dockerClient = client,
+            containerId = containerId,
+            command = command,
+            environment = environment,
+        )
 }
 
 data class CommandResult(val exitCode: Int, val output: String)
