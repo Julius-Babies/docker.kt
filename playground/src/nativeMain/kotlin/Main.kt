@@ -22,23 +22,29 @@ fun main() {
             println("Total containers: ${containers.size}")
 
             // Create test container
-            dockerClient.images.pull("alpine:latest", onDownload = { _, _ -> })
+            dockerClient.images.pull("postgres:18.1-alpine3.22", onDownload = { _, _ -> })
             println("Creating test container...")
             var containerId = dockerClient.containers.getContainers(all = true)
                 .firstOrNull { it.names.contains("/testcontainer") }?.id
             if (containerId == null) dockerClient.containers.createContainer(
-                image = "alpine:latest",
+                image = "postgres:18.1-alpine3.22",
                 volumeBinds = mapOf(
                     VolumeBind.Host(getSocketPath()) to "/var/run/docker.sock"
                 ),
-                name = "testcontainer"
+                name = "testcontainer",
+                environment = mapOf("POSTGRES_PASSWORD" to "testpw")
             )
             containerId = dockerClient.containers.getContainers(all = true).firstOrNull { it.names.contains("/testcontainer") }?.id
-            // start test container
             dockerClient.containers.startContainer(containerId!!)
 
             val r = dockerClient.containers.runCommand(containerId, listOf("ls", "-lah", "/"))
             println(r.output)
+
+            val r2 = dockerClient.containers.runCommandStream(
+                containerId = containerId,
+                command = listOf("sh", "-c", "echo 'Hello from container!' && sleep 3 && echo 'Bye!'"),
+            )
+            r2.stdout.collect { println(it) }
 
             containers.forEach { container ->
                 println("  - ${container.names.firstOrNull()} | ${container.state} | ${container.image}")
