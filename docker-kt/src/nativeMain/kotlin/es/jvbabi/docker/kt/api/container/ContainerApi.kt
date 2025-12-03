@@ -8,9 +8,12 @@ import es.jvbabi.docker.kt.api.container.functions.killContainer
 import es.jvbabi.docker.kt.api.container.functions.pauseContainer
 import es.jvbabi.docker.kt.api.container.functions.restartContainer
 import es.jvbabi.docker.kt.api.container.functions.runCommandInternalSimple
+import es.jvbabi.docker.kt.api.container.functions.runCommandInternalFlow
 import es.jvbabi.docker.kt.api.container.functions.startContainerInternal
 import es.jvbabi.docker.kt.api.container.functions.stopContainer
 import es.jvbabi.docker.kt.docker.DockerClient
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.flow.Flow
 
 class ContainerApi internal constructor(private val client: DockerClient) {
     /**
@@ -85,9 +88,37 @@ class ContainerApi internal constructor(private val client: DockerClient) {
             command = command,
             environment = environment,
         )
+
+    /**
+     * Asynchronous variant of `runCommand` that returns streaming flows for stdout and stderr
+     * as well as a Deferred that completes with the exit code once the command finished.
+     *
+     * The function returns immediately; the streams produce strings as data arrives.
+     */
+    fun runCommandStream(
+        containerId: String,
+        command: List<String>,
+        environment: Map<String, String> = emptyMap(),
+    ): CommandStreamResult =
+        runCommandInternalFlow(
+            dockerClient = client,
+            containerId = containerId,
+            command = command,
+            environment = environment,
+        )
 }
 
 data class CommandResult(val exitCode: Int, val output: String)
+
+/**
+ * Result of a streaming command execution.
+ * stdout/stderr are cold Flows backed by channels; exitCode is completed when the command finishes.
+ */
+data class CommandStreamResult(
+    val stdout: Flow<String>,
+    val stderr: Flow<String>,
+    val exitCode: Deferred<Int>
+)
 
 sealed class VolumeBind {
     abstract val readOnly: Boolean
