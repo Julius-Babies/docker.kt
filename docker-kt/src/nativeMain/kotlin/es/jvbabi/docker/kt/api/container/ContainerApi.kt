@@ -1,16 +1,7 @@
 package es.jvbabi.docker.kt.api.container
 
 import es.jvbabi.docker.kt.api.container.api.DockerContainer
-import es.jvbabi.docker.kt.api.container.functions.createContainerInternal
-import es.jvbabi.docker.kt.api.container.functions.deleteContainer
-import es.jvbabi.docker.kt.api.container.functions.getContainers
-import es.jvbabi.docker.kt.api.container.functions.killContainer
-import es.jvbabi.docker.kt.api.container.functions.pauseContainer
-import es.jvbabi.docker.kt.api.container.functions.restartContainer
-import es.jvbabi.docker.kt.api.container.functions.runCommandInternalSimple
-import es.jvbabi.docker.kt.api.container.functions.runCommandInternalFlow
-import es.jvbabi.docker.kt.api.container.functions.startContainerInternal
-import es.jvbabi.docker.kt.api.container.functions.stopContainer
+import es.jvbabi.docker.kt.api.container.functions.*
 import es.jvbabi.docker.kt.docker.DockerClient
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.flow.Flow
@@ -33,7 +24,6 @@ class ContainerApi internal constructor(private val client: DockerClient) {
      * @param volumeBinds Map of volume bindings: [VolumeBind] to container path
      * @param environment Map of environment variables: key to value
      * @param labels Map of labels: key to value
-     * @param ports Map of port mappings: container port to host port (e.g., 80 to 8080)
      * @param exposedPorts List of ports to expose without host binding
      * @throws es.jvbabi.docker.kt.api.image.ImageNotFoundException if the specified image does not exist
      */
@@ -43,8 +33,8 @@ class ContainerApi internal constructor(private val client: DockerClient) {
         volumeBinds: Map<VolumeBind, String> = emptyMap(),
         environment: Map<String, String> = emptyMap(),
         labels: Map<String, String> = emptyMap(),
-        ports: Map<Int, Int> = emptyMap(),
-        exposedPorts: List<Int> = emptyList(),
+        ports: List<PortBinding> = emptyList(),
+        exposedPorts: Map<Int, PortBinding.Protocol> = emptyMap(),
         networkConfigs: List<NetworkConfig> = emptyList()
     ) = createContainerInternal(
         dockerClient = client,
@@ -154,5 +144,13 @@ data class NetworkConfig(
     val networkId: String,
     val aliases: List<String> = emptyList()
 )
+
+data class PortBinding(
+    val hostPort: Int,
+    val containerPort: Int,
+    val protocol: Protocol
+) {
+    enum class Protocol { TCP, UDP }
+}
 
 class ContainerAlreadyRunningException(val id: String): Exception("Container $id is already running")

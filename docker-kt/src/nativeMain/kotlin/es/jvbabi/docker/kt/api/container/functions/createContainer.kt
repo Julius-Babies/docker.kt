@@ -52,8 +52,8 @@ internal suspend fun createContainerInternal(
     volumeBinds: Map<VolumeBind, String> = emptyMap(),
     environment: Map<String, String> = emptyMap(),
     labels: Map<String, String> = emptyMap(),
-    ports: Map<Int, Int> = emptyMap(),
-    exposedPorts: List<Int> = emptyList(),
+    ports: List<es.jvbabi.docker.kt.api.container.PortBinding> = emptyList(),
+    exposedPorts: Map<Int, es.jvbabi.docker.kt.api.container.PortBinding.Protocol> = emptyMap(),
     networkConfigs: List<NetworkConfig>,
 ) {
     val binds = volumeBinds.map { (bind, containerPath) ->
@@ -67,17 +67,15 @@ internal suspend fun createContainerInternal(
     val envList = environment.map { (k, v) -> "$k=$v" }
 
     // Build port bindings: Map<String, List<PortBinding>>
-    val portBindings: Map<String, List<PortBinding>> = ports.mapKeys { (containerPort, _) ->
-        "$containerPort/tcp"
-    }.mapValues { (_, hostPort) ->
-        listOf(PortBinding(hostPort = hostPort.toString()))
+    val portBindings: Map<String, List<PortBinding>> = ports.associate { binding ->
+        "${binding.containerPort}/${binding.protocol.name.lowercase()}" to listOf(PortBinding(hostPort = binding.hostPort.toString()))
     }
 
     // Build exposed ports from both port mappings and explicitly exposed ports
-    val allExposedPorts: Map<String, EmptyObject> =
-        (ports.keys + exposedPorts).distinct().associate { port ->
-            "$port/tcp" to EmptyObject()
-        }
+    val allExposedPorts: Map<String, EmptyObject> = ports
+        .map { "${it.containerPort}/${it.protocol.name.lowercase()}" }
+        .plus(exposedPorts.map { "${it.key}/${it.value.name.lowercase()}" })
+        .associateWith { EmptyObject() }
 
     val request = CreateContainerRequest(
         image = image,
