@@ -151,6 +151,21 @@ data class PortBinding(
     val protocol: Protocol
 ) {
     enum class Protocol { TCP, UDP }
+
+    companion object {
+        fun from(input: String): PortBinding {
+            if ('/' in input) {
+                val (ports, protocol) = input.split("/")
+                return from(ports).copy(protocol = Protocol.valueOf(protocol.uppercase()))
+            }
+            val (hostPort, containerPort) = input.split(":")
+            return PortBinding(
+                hostPort = hostPort.toInt(),
+                containerPort = containerPort.toInt(),
+                protocol = Protocol.TCP
+            )
+        }
+    }
 }
 
 class ContainerAlreadyRunningException(val id: String): Exception("Container $id is already running")
