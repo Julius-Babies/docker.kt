@@ -16,6 +16,8 @@ private data class CreateContainerRequest(
     @SerialName("HostConfig") val hostConfig: HostConfig = HostConfig(),
     @SerialName("Env") val env: List<String> = emptyList(),
     @SerialName("Labels") val labels: Map<String, String> = emptyMap(),
+    @SerialName("Entrypoint") val entrypoint: List<String>? = null,
+    @SerialName("Cmd") val cmd: List<String>? = null,
     @SerialName("ExposedPorts") val exposedPorts: Map<String, EmptyObject> = emptyMap(),
     @SerialName("NetworkingConfig") val networkingConfig: NetworkingConfig
 ) {
@@ -48,13 +50,15 @@ private class EmptyObject
 internal suspend fun createContainerInternal(
     dockerClient: DockerClient,
     image: String,
-    name: String? = null,
-    volumeBinds: Map<VolumeBind, String> = emptyMap(),
-    environment: Map<String, String> = emptyMap(),
-    labels: Map<String, String> = emptyMap(),
-    ports: List<es.jvbabi.docker.kt.api.container.PortBinding> = emptyList(),
-    exposedPorts: Map<Int, es.jvbabi.docker.kt.api.container.PortBinding.Protocol> = emptyMap(),
+    name: String?,
+    volumeBinds: Map<VolumeBind, String>,
+    environment: Map<String, String>,
+    labels: Map<String, String>,
+    ports: List<es.jvbabi.docker.kt.api.container.PortBinding>,
+    exposedPorts: Map<Int, es.jvbabi.docker.kt.api.container.PortBinding.Protocol>,
     networkConfigs: List<NetworkConfig>,
+    cmd: List<String>?,
+    entrypoint: List<String>?
 ) {
     val binds = volumeBinds.map { (bind, containerPath) ->
         val mountPath = when (bind) {
@@ -84,6 +88,8 @@ internal suspend fun createContainerInternal(
             portBindings = portBindings
         ),
         env = envList,
+        entrypoint = entrypoint,
+        cmd = cmd,
         labels = labels,
         exposedPorts = allExposedPorts,
         networkingConfig = CreateContainerRequest.NetworkingConfig(networkConfigs.associate { networkConfig ->

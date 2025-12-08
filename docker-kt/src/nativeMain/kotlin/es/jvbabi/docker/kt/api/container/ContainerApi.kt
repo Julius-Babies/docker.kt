@@ -35,7 +35,9 @@ class ContainerApi internal constructor(private val client: DockerClient) {
         labels: Map<String, String> = emptyMap(),
         ports: List<PortBinding> = emptyList(),
         exposedPorts: Map<Int, PortBinding.Protocol> = emptyMap(),
-        networkConfigs: List<NetworkConfig> = emptyList()
+        networkConfigs: List<NetworkConfig> = emptyList(),
+        entrypoint: List<String>? = null,
+        cmd: List<String>? = null
     ) = createContainerInternal(
         dockerClient = client,
         image = image,
@@ -46,6 +48,8 @@ class ContainerApi internal constructor(private val client: DockerClient) {
         ports = ports,
         exposedPorts = exposedPorts,
         networkConfigs = networkConfigs,
+        cmd = cmd,
+        entrypoint = entrypoint,
     )
 
     /**
