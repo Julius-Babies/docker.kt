@@ -5,6 +5,8 @@ import es.jvbabi.docker.kt.api.container.functions.*
 import es.jvbabi.docker.kt.docker.DockerClient
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.flow.Flow
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 class ContainerApi internal constructor(private val client: DockerClient) {
     /**
@@ -21,7 +23,7 @@ class ContainerApi internal constructor(private val client: DockerClient) {
      *
      * @param image The image to use for the container (e.g., "nginx:latest")
      * @param name Optional name for the container
-     * @param volumeBinds Map of volume bindings: [VolumeBind] to container path
+     * @param volumeBinds Map of volume bindings: [Container.VolumeBind] to container path
      * @param environment Map of environment variables: key to value
      * @param labels Map of labels: key to value
      * @param exposedPorts List of ports to expose without host binding
@@ -30,18 +32,20 @@ class ContainerApi internal constructor(private val client: DockerClient) {
     suspend fun createContainer(
         image: String,
         name: String? = null,
-        volumeBinds: Map<VolumeBind, String> = emptyMap(),
+        healthCheck: Container.Healthcheck? = null,
+        volumeBinds: Map<Container.VolumeBind, String> = emptyMap(),
         environment: Map<String, String> = emptyMap(),
         labels: Map<String, String> = emptyMap(),
-        ports: List<PortBinding> = emptyList(),
-        exposedPorts: Map<Int, PortBinding.Protocol> = emptyMap(),
-        networkConfigs: List<NetworkConfig> = emptyList(),
+        ports: List<Container.PortBinding> = emptyList(),
+        exposedPorts: Map<Int, Container.PortBinding.Protocol> = emptyMap(),
+        networkConfigs: List<Container.NetworkConfig> = emptyList(),
         entrypoint: List<String>? = null,
         cmd: List<String>? = null
     ) = createContainerInternal(
         dockerClient = client,
         image = image,
         name = name,
+        healthCheck = healthCheck,
         volumeBinds = volumeBinds,
         environment = environment,
         labels = labels,
@@ -70,6 +74,8 @@ class ContainerApi internal constructor(private val client: DockerClient) {
     suspend fun pauseContainer(id: String) = pauseContainer(client, id)
 
     suspend fun deleteContainer(id: String) = deleteContainer(client, id)
+
+    suspend fun inspectContainer(id: String) = inspectContainer(client, id)
 
     suspend fun runCommand(
         containerId: String,
@@ -114,60 +120,72 @@ data class CommandStreamResult(
     val exitCode: Deferred<Int>
 )
 
-sealed class VolumeBind {
-    abstract val readOnly: Boolean
+object Container {
+    data class Healthcheck(
+        val test: List<String>,
+        val interval: Duration = 30.seconds,
+        val timeout: Duration = 30.seconds,
+        val startPeriod: Duration = 0.seconds,
+        val retries: Int = 3
+    )
 
-    data class Host(
-        val path: String,
-        override val readOnly: Boolean = false
-    ) : VolumeBind()
+    data class PortBinding(
+        val hostPort: Int,
+        val containerPort: Int,
+        val protocol: Protocol
+    ) {
+        enum class Protocol { TCP, UDP }
 
-    data class Volume(
-        val name: String,
-        override val readOnly: Boolean = false
-    ) : VolumeBind()
-
-    companion object {
-        fun from(input: String): Pair<VolumeBind, String> {
-            when (input.count { it == ':' }) {
-                1 -> {
-                    val (host, container) = input.split(":")
-                    return Host(host, false) to container
+        companion object {
+            fun from(input: String): PortBinding {
+                if ('/' in input) {
+                    val (ports, protocol) = input.split("/")
+                    return from(ports).copy(protocol = Protocol.valueOf(protocol.uppercase()))
                 }
-                2 -> {
-                    val (host, container, readOnly) = input.split(":")
-                    return Host(host, readOnly.lowercase() == "ro") to container
-                }
-                else -> error("Invalid volume bind: $input")
+                val (hostPort, containerPort) = input.split(":")
+                return PortBinding(
+                    hostPort = hostPort.toInt(),
+                    containerPort = containerPort.toInt(),
+                    protocol = Protocol.TCP
+                )
             }
         }
     }
-}
 
-data class NetworkConfig(
-    val networkId: String,
-    val aliases: List<String> = emptyList()
-)
+    data class NetworkConfig(
+        val networkId: String,
+        val aliases: List<String> = emptyList()
+    )
 
-data class PortBinding(
-    val hostPort: Int,
-    val containerPort: Int,
-    val protocol: Protocol
-) {
-    enum class Protocol { TCP, UDP }
+    sealed class VolumeBind {
+        abstract val readOnly: Boolean
 
-    companion object {
-        fun from(input: String): PortBinding {
-            if ('/' in input) {
-                val (ports, protocol) = input.split("/")
-                return from(ports).copy(protocol = Protocol.valueOf(protocol.uppercase()))
+        data class Host(
+            val path: String,
+            override val readOnly: Boolean = false
+        ) : VolumeBind()
+
+        data class Volume(
+            val name: String,
+            override val readOnly: Boolean = false
+        ) : VolumeBind()
+
+        companion object {
+            fun from(input: String): Pair<VolumeBind, String> {
+                when (input.count { it == ':' }) {
+                    1 -> {
+                        val (host, container) = input.split(":")
+                        return Host(host, false) to container
+                    }
+
+                    2 -> {
+                        val (host, container, readOnly) = input.split(":")
+                        return Host(host, readOnly.lowercase() == "ro") to container
+                    }
+
+                    else -> error("Invalid volume bind: $input")
+                }
             }
-            val (hostPort, containerPort) = input.split(":")
-            return PortBinding(
-                hostPort = hostPort.toInt(),
-                containerPort = containerPort.toInt(),
-                protocol = Protocol.TCP
-            )
         }
     }
 }

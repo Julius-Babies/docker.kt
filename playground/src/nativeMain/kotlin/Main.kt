@@ -1,8 +1,12 @@
-import es.jvbabi.docker.kt.api.container.VolumeBind
+import es.jvbabi.docker.kt.api.container.Container
 import es.jvbabi.docker.kt.docker.DockerClient
 import es.jvbabi.docker.kt.docker.auth.getAuthForRegistry
 import es.jvbabi.docker.kt.docker.getSocketPath
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlin.time.Duration.Companion.milliseconds
 
 fun main() {
     runBlocking {
@@ -29,13 +33,20 @@ fun main() {
             if (containerId == null) dockerClient.containers.createContainer(
                 image = "postgres:18.1-alpine3.22",
                 volumeBinds = mapOf(
-                    VolumeBind.Host(getSocketPath()) to "/var/run/docker.sock"
+                    Container.VolumeBind.Host(getSocketPath()) to "/var/run/docker.sock"
                 ),
                 name = "testcontainer",
                 environment = mapOf("POSTGRES_PASSWORD" to "testpw")
             )
             containerId = dockerClient.containers.getContainers(all = true).firstOrNull { it.names.contains("/testcontainer") }?.id
-            dockerClient.containers.startContainer(containerId!!)
+            requireNotNull(containerId)
+            coroutineScope {
+                launch { dockerClient.containers.startContainer(containerId) }
+                repeat(10) {
+                    println(dockerClient.containers.inspectContainer(containerId).state.status)
+                    delay(100.milliseconds)
+                }
+            }
 
             val r = dockerClient.containers.runCommand(containerId, listOf("ls", "-lah", "/"))
             println(r.output)

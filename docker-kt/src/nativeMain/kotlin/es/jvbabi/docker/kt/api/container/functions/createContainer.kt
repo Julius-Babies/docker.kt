@@ -1,7 +1,8 @@
 package es.jvbabi.docker.kt.api.container.functions
 
-import es.jvbabi.docker.kt.api.container.NetworkConfig
-import es.jvbabi.docker.kt.api.container.VolumeBind
+import es.jvbabi.docker.kt.api.container.Container
+import es.jvbabi.docker.kt.api.container.Container.NetworkConfig
+import es.jvbabi.docker.kt.api.container.Container.VolumeBind
 import es.jvbabi.docker.kt.api.image.ImageNotFoundException
 import es.jvbabi.docker.kt.docker.DockerClient
 import io.ktor.client.request.*
@@ -17,10 +18,18 @@ private data class CreateContainerRequest(
     @SerialName("Env") val env: List<String> = emptyList(),
     @SerialName("Labels") val labels: Map<String, String> = emptyMap(),
     @SerialName("Entrypoint") val entrypoint: List<String>? = null,
+    @SerialName("Healthcheck") val healthcheck: Healthcheck? = null,
     @SerialName("Cmd") val cmd: List<String>? = null,
     @SerialName("ExposedPorts") val exposedPorts: Map<String, EmptyObject> = emptyMap(),
     @SerialName("NetworkingConfig") val networkingConfig: NetworkingConfig
 ) {
+    @Serializable
+    data class Healthcheck(
+        @SerialName("Test") val test: List<String> = emptyList(),
+        @SerialName("Interval") val interval: Long = 0,
+        @SerialName("Timeout") val timeout: Long = 0,
+        @SerialName("Retries") val retries: Int = 0
+    )
     @Serializable
     data class NetworkingConfig(
         @SerialName("EndpointsConfig") val endpointsConfig: Map<String, EndpointConfig>
@@ -51,11 +60,12 @@ internal suspend fun createContainerInternal(
     dockerClient: DockerClient,
     image: String,
     name: String?,
+    healthCheck: Container.Healthcheck?,
     volumeBinds: Map<VolumeBind, String>,
     environment: Map<String, String>,
     labels: Map<String, String>,
-    ports: List<es.jvbabi.docker.kt.api.container.PortBinding>,
-    exposedPorts: Map<Int, es.jvbabi.docker.kt.api.container.PortBinding.Protocol>,
+    ports: List<Container.PortBinding>,
+    exposedPorts: Map<Int, Container.PortBinding.Protocol>,
     networkConfigs: List<NetworkConfig>,
     cmd: List<String>?,
     entrypoint: List<String>?
@@ -89,6 +99,14 @@ internal suspend fun createContainerInternal(
         ),
         env = envList,
         entrypoint = entrypoint,
+        healthcheck = healthCheck?.let { healthCheck ->
+            CreateContainerRequest.Healthcheck(
+                test = healthCheck.test,
+                interval = healthCheck.interval.inWholeNanoseconds,
+                timeout = healthCheck.timeout.inWholeNanoseconds,
+                retries = healthCheck.retries
+            )
+        },
         cmd = cmd,
         labels = labels,
         exposedPorts = allExposedPorts,
