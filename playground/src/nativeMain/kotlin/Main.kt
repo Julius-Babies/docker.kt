@@ -16,6 +16,13 @@ fun main() {
 
             println(getAuthForRegistry("registry.gitlab.jvbabi.es"))
 
+            val postgres = dockerClient.containers.getContainers(all = true)
+                .onEach { println(it) }
+                .firstOrNull { it.names.contains("/werkbank-postgres-18") }
+            dockerClient.containers.inspectContainer(postgres!!.id).let {
+                println(it.networkSettings.networks.map { it.value.aliases })
+            }
+
             println("\n=== Networks ===")
             val networks = dockerClient.networks.getNetworks()
             val testId = networks.find { it.name == "testnetwork" }?.id
