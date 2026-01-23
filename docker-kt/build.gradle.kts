@@ -65,7 +65,6 @@ kotlin {
 
 
 mavenPublishing {
-    println("Publishing version $version")
     publishToMavenCentral()
     if (!gradle.startParameter.taskNames.any { it.contains("publishToMavenLocal") }) {
         signAllPublications()
