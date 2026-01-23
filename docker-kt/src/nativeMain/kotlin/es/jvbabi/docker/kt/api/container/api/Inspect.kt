@@ -11,6 +11,7 @@ data class Inspect(
     @SerialName("State") val state: ContainerState,
     @SerialName("Config") val config: ContainerConfig,
     @SerialName("HostConfig") val hostConfig: HostConfig,
+    @SerialName("NetworkSettings") val networkSettings: InspectNetworkSettings
 )
 
 @Serializable
@@ -74,3 +75,40 @@ data class PortBinding(
     @SerialName("HostIp") val hostIp: String,
     @SerialName("HostPort") val hostPort: String
 )
+
+@Serializable
+data class InspectNetworkSettings(
+    @SerialName("Networks") val networks: Map<String, InspectNetwork>,
+    @SerialName("SandboxID") val sandboxId: String,
+    @SerialName("SandboxKey") val sandboxKey: String,
+    @SerialName("Ports") val ports: Map<String, List<PortBinding>?>
+) {
+    @Serializable
+    data class PortBinding(
+        @SerialName("HostIp") val hostIp: String,
+        @SerialName("HostPort") val hostPort: String
+    )
+}
+
+@Serializable
+data class InspectNetwork(
+    @SerialName("IPAMConfig") val ipamConfig: InspectIPAMConfig?,
+    @SerialName("Links") val links: List<String>?,
+    @SerialName("Aliases") val aliases: List<String>?,
+    @SerialName("NetworkID") val networkId: String,
+    @SerialName("EndpointID") val endpointId: String,
+    @SerialName("Gateway") val gateway: String,
+    @SerialName("IPAddress") val ipAddress: String,
+    @SerialName("IPPrefixLen") val ipPrefixLen: Int,
+    @SerialName("IPv6Gateway") val ipv6Gateway: String,
+    @SerialName("GlobalIPv6Address") val globalIPv6Address: String,
+    @SerialName("GlobalIPv6PrefixLen") val globalIPv6PrefixLen: Int,
+    @SerialName("MacAddress") val macAddress: String,
+) {
+    @Serializable
+    data class InspectIPAMConfig(
+        @SerialName("IPv4Address") val ipv4Address: String,
+        @SerialName("IPv6Address") val ipv6Address: String,
+        @SerialName("LinkLocalIPs") val linkLocalIPs: List<String>
+    )
+}
