@@ -57,7 +57,7 @@ data class ContainerConfig(
     @SerialName("OpenStdin") val openStdin: Boolean,
     @SerialName("StdinOnce") val stdinOnce: Boolean,
     @SerialName("Env") val env: List<String>,
-    @SerialName("Cmd") val cmd: List<String>,
+    @SerialName("Cmd") val cmd: List<String>?,
     @SerialName("Image") val image: String,
     @SerialName("Labels") val labels: Map<String, String>,
     @SerialName("WorkingDir") val workingDir: String,
