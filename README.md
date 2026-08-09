@@ -4,7 +4,7 @@ A Kotlin/Native library for interacting with Docker through Unix domain sockets.
 
 ## Tests
 
-The suite consists of Kotest integration tests that talk to a real Docker daemon, so a running Docker instance is required.
+The suite is Kotest and splits in two. Most specs are integration tests that talk to a real Docker daemon and are tagged `RequiresDocker`; the rest are plain unit tests over the parsing helpers and need nothing at all.
 
 Native test binaries only run on a matching host, so use the test task of your host target:
 
@@ -14,7 +14,7 @@ Native test binaries only run on a matching host, so use the test task of your h
 ./gradlew allTests                    # everything runnable on the current host
 ```
 
-Every spec is tagged `RequiresDocker`, so the whole suite can be skipped on a host without a daemon:
+Drop the tag to run the unit tests alone — no daemon, and it finishes in under a second:
 
 ```bash
 KOTEST_TAGS='!RequiresDocker' ./gradlew :docker-kt:macosArm64Test
@@ -32,7 +32,9 @@ src/nativeTest/kotlin/es/jvbabi/docker/kt/
 └── system/     DockerClient itself
 ```
 
-Two rules keep the suite reusable on a real development machine:
+A spec that needs a daemon declares `tags(RequiresDocker)`; one that does not, says so in its doc comment and stays untagged.
+
+Two rules keep the integration specs reusable on a real development machine:
 
 - **Everything is scoped to the run.** Containers, volumes, networks and temp directories are named through `testResourceName(...)`, which appends a per-run id. Nothing is ever addressed by a fixed name.
 - **`afterSpec` restores the host**, and runs its teardown through the `…Quietly` helpers so a cleanup error cannot mask the failure that caused it. Where a resource is global and cannot be run-scoped — an image tag, for instance — the spec puts back what it found.
