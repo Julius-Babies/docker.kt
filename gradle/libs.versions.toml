@@ -1,11 +1,11 @@
 [versions]
-maven-publish = "0.36.0"
-kotlin = "2.3.0"
-kotlinxSerialization = "1.10.0"
-ktor = "3.3.3"
-kotest = "6.1.1"
-ksp = "2.3.4"
-kfile = "v0.0.8"
+maven-publish = "0.37.0"
+kotlin = "2.4.10"
+kotlinxSerialization = "1.11.0"
+ktor = "3.5.2"
+kotest = "6.2.3"
+ksp = "2.3.11"
+kfile = "0.4.0"
 kommand = "2.3.0"
 
 [libraries]

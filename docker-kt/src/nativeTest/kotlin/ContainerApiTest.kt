@@ -1,5 +1,5 @@
+import es.jvbabi.docker.kt.api.container.Container
 import es.jvbabi.docker.kt.api.container.ContainerState
-import es.jvbabi.docker.kt.api.container.VolumeBind
 import es.jvbabi.docker.kt.api.image.ImageNotFoundException
 import es.jvbabi.docker.kt.docker.DockerClient
 import io.kotest.assertions.throwables.shouldThrow
@@ -204,8 +204,8 @@ class ContainerApiTest : FunSpec({
                 image = testImageName,
                 name = volumeTestName,
                 volumeBinds = mapOf(
-                    VolumeBind.Volume("my-test-volume") to "/data",
-                    VolumeBind.Host("/tmp") to "/host-tmp"
+                    Container.VolumeBind.Volume("my-test-volume") to "/data",
+                    Container.VolumeBind.Host("/tmp") to "/host-tmp"
                 )
             )
 
