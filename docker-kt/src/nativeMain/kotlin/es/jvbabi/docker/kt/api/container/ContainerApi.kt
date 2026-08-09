@@ -1,8 +1,11 @@
 package es.jvbabi.docker.kt.api.container
 
 import es.jvbabi.docker.kt.api.Container
+import es.jvbabi.docker.kt.api.Network
 import es.jvbabi.docker.kt.api.container.api.DockerContainer
+import es.jvbabi.docker.kt.api.container.api.Inspect
 import es.jvbabi.docker.kt.api.container.functions.*
+import es.jvbabi.docker.kt.api.network.functions.internalGetNetworksRequest
 import es.jvbabi.docker.kt.docker.DockerClient
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.flow.Flow
@@ -80,15 +83,35 @@ class ContainerApi internal constructor(private val client: DockerClient) {
                 .map { it.toPortAndProtocol() }
                 .groupBy({ (port, _) -> port }, { (_, protocol) -> protocol })
                 .mapValues { (_, protocols) -> protocols.toSet() },
-            networks = inspect.networkSettings.networks.map { (_, endpoint) ->
-                Container.NetworkConfig(
-                    networkId = endpoint.networkId,
-                    aliases = endpoint.aliases.orEmpty()
-                )
-            }
+            networks = resolveNetworks(inspect)
         ).apply {
             this.id = inspect.id
             state = inspect.state.status.toContainerState()
+        }
+    }
+
+    /**
+     * Turns the endpoints inspect reports into the [Network] objects a [Container] holds on to.
+     *
+     * Endpoints only carry an id, so the networks are looked up once for the whole container. Which
+     * key identifies them depends on how far the container got: once it has run, inspect keys the
+     * endpoints by network name and fills in NetworkID - before that the key is whatever the create
+     * request used, and NetworkID is still empty.
+     */
+    private suspend fun resolveNetworks(inspect: Inspect): List<Container.NetworkConfig> {
+        val endpoints = inspect.networkSettings.networks
+        if (endpoints.isEmpty()) return emptyList()
+
+        val known = internalGetNetworksRequest(client)
+
+        return endpoints.mapNotNull { (key, endpoint) ->
+            val network = known.find { it.id == endpoint.networkId }
+                ?: known.find { it.id == key || it.name == key }
+                // A network the daemon no longer lists cannot be handed out as an object. It cannot
+                // normally happen either: Docker refuses to remove a network still in use.
+                ?: return@mapNotNull null
+
+            Container.NetworkConfig(network = network, aliases = endpoint.aliases.orEmpty())
         }
     }
 

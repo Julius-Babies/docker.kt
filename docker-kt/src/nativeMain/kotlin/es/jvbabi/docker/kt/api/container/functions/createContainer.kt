@@ -114,7 +114,7 @@ internal suspend fun createContainerInternal(
         labels = labels,
         exposedPorts = allExposedPorts,
         networkingConfig = CreateContainerRequest.NetworkingConfig(networkConfigs.associate { networkConfig ->
-            networkConfig.networkId to CreateContainerRequest.NetworkingConfig.EndpointConfig(
+            networkConfig.network.id to CreateContainerRequest.NetworkingConfig.EndpointConfig(
                 aliases = networkConfig.aliases
             )
         })

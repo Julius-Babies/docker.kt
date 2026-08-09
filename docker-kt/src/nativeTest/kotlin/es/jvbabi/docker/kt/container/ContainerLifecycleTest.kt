@@ -4,12 +4,12 @@ import es.jvbabi.docker.kt.api.Container
 import es.jvbabi.docker.kt.api.container.ContainerState
 import es.jvbabi.docker.kt.support.*
 import es.jvbabi.kfile.File
+import io.kotest.assertions.nondeterministic.eventually
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
-import io.kotest.matchers.types.shouldBeSameInstanceAs
 import io.kotest.matchers.maps.shouldContainAll
 import io.kotest.matchers.maps.shouldContainKey
 import io.kotest.matchers.maps.shouldNotContainKey
@@ -64,10 +64,12 @@ class ContainerLifecycleTest : FunSpec({
 
         withDocker { client ->
             client.ensureImage(IMAGE)
-            client.networkBuilder(networkName) {
-                labels { putAll(labels) }
-            }.create()
-            networkId = client.networks.getNetworks().first { it.name == networkName }.id
+
+            val network = client.networkBuilder(networkName) { labels { putAll(labels) } }
+            network.create()
+            // Only the id is carried across tests: a Network belongs to the client it came from,
+            // and this one is closed at the end of the block.
+            networkId = network.id
         }
     }
 
@@ -82,6 +84,9 @@ class ContainerLifecycleTest : FunSpec({
 
     test("creates a container with volumes, ports, labels, environment and a network") {
         withDocker { client ->
+            // The builder block is not suspending, so the network is fetched before it.
+            val network = client.networks.getById(networkId).shouldNotBeNull()
+
             val container = client.containerBuilder(IMAGE) {
                 name = containerName
                 healthCheck = Container.Healthcheck(test = listOf("CMD-SHELL", "true"))
@@ -107,7 +112,7 @@ class ContainerLifecycleTest : FunSpec({
                 }
 
                 networks {
-                    connect(networkId, listOf(networkAlias))
+                    connect(network, listOf(networkAlias))
                 }
             }
 
@@ -167,9 +172,15 @@ class ContainerLifecycleTest : FunSpec({
             val containerId = client.containerByName(containerName).shouldNotBeNull().id
             client.containers.startContainer(containerId)
 
-            val inspect = client.containers.inspectContainer(containerId)
-            inspect.state.running shouldBe true
-            inspect.state.status shouldBe "running"
+            // The start request can return before the daemon reports the new state, so poll rather
+            // than wait a fixed amount: fast when it is fast, and still honest about a container
+            // that came up and died right away.
+            val inspect = eventually(5.seconds) {
+                client.containers.inspectContainer(containerId).also {
+                    it.state.running shouldBe true
+                    it.state.status shouldBe "running"
+                }
+            }
 
             // Docker publishes one entry per host address family, so check that ours is among them.
             val published = inspect.networkSettings.ports["$CONTAINER_PORT/tcp"].shouldNotBeNull()
@@ -208,6 +219,12 @@ class ContainerLifecycleTest : FunSpec({
             fetched.volumes.map { it.containerPath } shouldContainExactlyInAnyOrder
                 listOf("/mnt/host", "/mnt/volume")
             fetched.ports.single().hostPort shouldBe HOST_PORT
+
+            // The endpoint is resolved back into the network itself, not just its id.
+            val attached = fetched.networks.single()
+            attached.network.id shouldBe networkId
+            attached.network.name shouldBe networkName
+            attached.aliases shouldContain networkAlias
         }
     }
 
@@ -231,6 +248,23 @@ class ContainerLifecycleTest : FunSpec({
 
             container.state shouldBeSameInstanceAs Container.State.NonExisting.Deleted
             client.containerByName(containerName) shouldBe null
+        }
+    }
+
+    test("a container attached to a network that does not exist yet is refused") {
+        withDocker { client ->
+            // Never created, so it has no id the daemon could be pointed at.
+            val draftNetwork = client.networkBuilder("$networkName-draft")
+
+            val container = client.containerBuilder(IMAGE) {
+                name = "$containerName-unattached"
+                networks { connect(draftNetwork) }
+            }
+
+            shouldThrow<IllegalStateException> { container.create() }
+
+            container.state shouldBeSameInstanceAs Container.State.NonExisting.Draft
+            client.containerByName("$containerName-unattached") shouldBe null
         }
     }
 

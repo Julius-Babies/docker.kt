@@ -48,12 +48,20 @@ class Container internal constructor(
      *
      * Only a [State.NonExisting.Draft] can be created - a container that already exists would be
      * duplicated, and a deleted one has a name the daemon may since have handed to someone else.
+     * Every network it is attached to has to exist by now, since the container is registered with
+     * their ids.
      *
      * @throws es.jvbabi.docker.kt.api.image.ImageNotFoundException if [image] does not exist
      */
     suspend fun create() {
         check(state is State.NonExisting.Draft) {
             "Only a draft can be created, but this container is $state"
+        }
+
+        networks.forEach { config ->
+            check(config.network.state is Network.State.Created) {
+                "Cannot attach to network '${config.network.name}': it is ${config.network.state}"
+            }
         }
 
         id = createContainerInternal(
@@ -160,8 +168,12 @@ class Container internal constructor(
         class NetworkConfig {
             internal val networks = mutableListOf<Container.NetworkConfig>()
 
-            fun connect(networkId: String, containerAliases: List<String> = emptyList()) {
-                networks.add(Container.NetworkConfig(networkId, containerAliases))
+            /**
+             * Attaches the container to [network]. The network has to exist by the time the
+             * container is created - see [Container.create].
+             */
+            fun connect(network: Network, containerAliases: List<String> = emptyList()) {
+                networks.add(Container.NetworkConfig(network, containerAliases))
             }
         }
 
@@ -289,7 +301,7 @@ class Container internal constructor(
     }
 
     data class NetworkConfig(
-        val networkId: String,
+        val network: Network,
         val aliases: List<String> = emptyList()
     )
 }
