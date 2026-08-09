@@ -2,6 +2,8 @@ package es.jvbabi.docker.kt.api
 
 import es.jvbabi.docker.kt.api.container.functions.createContainerInternal
 import es.jvbabi.docker.kt.api.container.functions.deleteContainer
+import es.jvbabi.docker.kt.api.network.functions.internalConnectNetworkRequest
+import es.jvbabi.docker.kt.api.network.functions.internalDisconnectNetworkRequest
 import es.jvbabi.docker.kt.docker.DockerClient
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -18,8 +20,14 @@ class Container internal constructor(
     val labels: Map<String, String>,
     val ports: List<PortBinding>,
     val exposedPorts: Map<Int, Set<PortBinding.Protocol>>,
-    val networks: List<NetworkConfig>
+    networks: List<NetworkConfig>
 ) {
+    /**
+     * The networks this container is attached to. Kept in step by [connectTo] and [disconnectFrom].
+     */
+    var networks: List<NetworkConfig> = networks
+        private set
+
     lateinit var state: State
 
     /**
@@ -80,6 +88,52 @@ class Container internal constructor(
         )
 
         state = State.Existing.Created
+    }
+
+    /**
+     * Attaches this container to [network], optionally under [aliases] that other containers on
+     * that network can reach it by.
+     *
+     * Both sides have to exist: the container is named by its id, the network addressed by its own.
+     */
+    suspend fun connectTo(network: Network, aliases: List<String> = emptyList()) {
+        checkAttachable(network)
+
+        internalConnectNetworkRequest(
+            dockerClient = client,
+            networkId = network.id,
+            containerId = id,
+            aliases = aliases
+        )
+
+        networks = networks + NetworkConfig(network, aliases)
+    }
+
+    /**
+     * Detaches this container from [network].
+     *
+     * @param force detaches it even while it is running
+     */
+    suspend fun disconnectFrom(network: Network, force: Boolean = false) {
+        checkAttachable(network)
+
+        internalDisconnectNetworkRequest(
+            dockerClient = client,
+            networkId = network.id,
+            containerId = id,
+            force = force
+        )
+
+        networks = networks.filterNot { it.network.id == network.id }
+    }
+
+    private fun checkAttachable(network: Network) {
+        check(state is State.Existing) {
+            "Only an existing container can be attached to a network, but this container is $state"
+        }
+        check(network.state is Network.State.Created) {
+            "Cannot attach to network '${network.name}': it is ${network.state}"
+        }
     }
 
     /**

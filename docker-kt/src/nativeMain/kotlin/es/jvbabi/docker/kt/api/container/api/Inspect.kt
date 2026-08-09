@@ -55,16 +55,18 @@ data class ContainerConfig(
     @SerialName("AttachStdin") val attachStdin: Boolean,
     @SerialName("AttachStdout") val attachStdout: Boolean,
     @SerialName("AttachStderr") val attachStderr: Boolean,
-    @SerialName("ExposedPorts") val exposedPorts: Map<String, Map<String, String>>,
+    // Docker leaves the collections out entirely when there is nothing to report, so none of them
+    // may be required.
+    @SerialName("ExposedPorts") val exposedPorts: Map<String, Map<String, String>> = emptyMap(),
     @SerialName("Tty") val tty: Boolean,
     @SerialName("OpenStdin") val openStdin: Boolean,
     @SerialName("StdinOnce") val stdinOnce: Boolean,
-    @SerialName("Env") val env: List<String>,
+    @SerialName("Env") val env: List<String> = emptyList(),
     @SerialName("Cmd") val cmd: List<String>?,
     @SerialName("Entrypoint") val entrypoint: List<String>? = null,
     @SerialName("Healthcheck") val healthcheck: InspectHealthcheck? = null,
     @SerialName("Image") val image: String,
-    @SerialName("Labels") val labels: Map<String, String>,
+    @SerialName("Labels") val labels: Map<String, String> = emptyMap(),
     @SerialName("WorkingDir") val workingDir: String,
     @SerialName("NetworkMode") val networkMode: String? = null
 )
@@ -82,7 +84,7 @@ data class InspectHealthcheck(
 @Serializable
 data class HostConfig(
     @SerialName("NetworkMode") val networkMode: String,
-    @SerialName("PortBindings") val portBindings: Map<String, List<PortBinding>>
+    @SerialName("PortBindings") val portBindings: Map<String, List<PortBinding>> = emptyMap()
 )
 
 @Serializable

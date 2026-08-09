@@ -69,6 +69,25 @@ class Network internal constructor(
     }
 
     /**
+     * Attaches [container] to this network, optionally under [aliases] that other containers on
+     * this network can reach it by.
+     *
+     * The same operation as [Container.connectTo], read from the other side.
+     */
+    suspend fun connect(container: Container, aliases: List<String> = emptyList()) =
+        container.connectTo(this, aliases)
+
+    /**
+     * Detaches [container] from this network.
+     *
+     * The same operation as [Container.disconnectFrom], read from the other side.
+     *
+     * @param force detaches it even while it is running
+     */
+    suspend fun disconnect(container: Container, force: Boolean = false) =
+        container.disconnectFrom(this, force)
+
+    /**
      * Removes this network from the daemon.
      *
      * Only a [State.Created] network can be removed - a draft was never sent anywhere, and a
