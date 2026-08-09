@@ -4,9 +4,12 @@ import es.jvbabi.docker.kt.api.Container
 import es.jvbabi.docker.kt.api.container.ContainerState
 import es.jvbabi.docker.kt.support.*
 import es.jvbabi.kfile.File
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainAll
+import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
+import io.kotest.matchers.types.shouldBeSameInstanceAs
 import io.kotest.matchers.maps.shouldContainAll
 import io.kotest.matchers.maps.shouldContainKey
 import io.kotest.matchers.maps.shouldNotContainKey
@@ -61,7 +64,9 @@ class ContainerLifecycleTest : FunSpec({
 
         withDocker { client ->
             client.ensureImage(IMAGE)
-            client.networks.createNetwork(name = networkName, labels = labels)
+            client.networkBuilder(networkName) {
+                labels { putAll(labels) }
+            }.create()
             networkId = client.networks.getNetworks().first { it.name == networkName }.id
         }
     }
@@ -81,7 +86,7 @@ class ContainerLifecycleTest : FunSpec({
                 name = containerName
                 healthCheck = Container.Healthcheck(test = listOf("CMD-SHELL", "true"))
                 entrypoint = listOf("/bin/sh", "-c")
-                cmd = listOf("/bin/sh", "-c")
+                cmd = listOf("sleep 3600")
 
                 volumes {
                     bindHost(hostDir.absolutePath, "/mnt/host", readOnly = true)
@@ -182,16 +187,60 @@ class ContainerLifecycleTest : FunSpec({
         }
     }
 
+    test("getById hands back the running container with its state read from the daemon") {
+        withDocker { client ->
+            val containerId = client.containerByName(containerName).shouldNotBeNull().id
+
+            val fetched = client.containers.getById(containerId)
+
+            fetched.shouldNotBeNull()
+            fetched.id shouldBe containerId
+            // Inspect reports the name with a leading slash, the object carries it without.
+            fetched.name shouldBe containerName
+            fetched.state shouldBeSameInstanceAs Container.State.Existing.Running
+
+            // The configuration comes back from the daemon rather than from the builder.
+            fetched.labels shouldContainAll labels
+            fetched.environment shouldContainAll environment
+            fetched.cmd shouldBe listOf("sleep 3600")
+            fetched.entrypoint shouldBe listOf("/bin/sh", "-c")
+            fetched.healthCheck.shouldNotBeNull().test shouldBe listOf("CMD-SHELL", "true")
+            fetched.volumes.map { it.containerPath } shouldContainExactlyInAnyOrder
+                listOf("/mnt/host", "/mnt/volume")
+            fetched.ports.single().hostPort shouldBe HOST_PORT
+        }
+    }
+
+    test("getById returns null for an id the daemon does not know") {
+        withDocker { client ->
+            // Well-formed but never handed out - Docker answers 404 rather than failing the request.
+            client.containers.getById("0".repeat(64)) shouldBe null
+        }
+    }
+
     test("removes the container once it has been stopped") {
         withDocker { client ->
             val containerId = client.containerByName(containerName).shouldNotBeNull().id
+            val container = client.containers.getById(containerId).shouldNotBeNull()
 
             client.containers.stopContainer(containerId)
             delay(2.seconds)
             client.containerByName(containerName).shouldNotBeNull().state shouldBe ContainerState.EXITED
 
-            client.containers.deleteContainer(containerId)
+            container.remove()
+
+            container.state shouldBeSameInstanceAs Container.State.NonExisting.Deleted
             client.containerByName(containerName) shouldBe null
+        }
+    }
+
+    test("a removed container can neither be removed nor created again") {
+        withDocker { client ->
+            val container = client.containerBuilder(IMAGE) { name = "$containerName-never-created" }
+
+            // A draft was never sent anywhere, so there is nothing to remove.
+            shouldThrow<IllegalStateException> { container.remove() }
+            container.state shouldBeSameInstanceAs Container.State.NonExisting.Draft
         }
     }
 })

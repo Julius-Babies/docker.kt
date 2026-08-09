@@ -60,7 +60,7 @@ suspend fun DockerClient.removeContainerQuietly(name: String) {
 
 suspend fun DockerClient.removeNetworkQuietly(id: String) {
     if (id.isEmpty()) return
-    runCatching { networks.removeNetwork(id) }
+    runCatching { networks.getById(id)?.remove() }
 }
 
 /** The library has no volume API yet, so this one goes over the raw socket. */

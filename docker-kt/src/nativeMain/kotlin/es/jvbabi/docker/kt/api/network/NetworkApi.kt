@@ -1,44 +1,24 @@
 package es.jvbabi.docker.kt.api.network
 
-import es.jvbabi.docker.kt.api.network.api.Network
-import es.jvbabi.docker.kt.api.network.functions.internalCreateNetworkRequest
-import es.jvbabi.docker.kt.api.network.functions.internalDeleteNetworkRequest
+import es.jvbabi.docker.kt.api.Network
+import es.jvbabi.docker.kt.api.network.functions.internalGetNetworkByIdRequest
 import es.jvbabi.docker.kt.api.network.functions.internalGetNetworksRequest
 import es.jvbabi.docker.kt.docker.DockerClient
 
 class NetworkApi internal constructor(private val client: DockerClient) {
 
     /**
-     * @param internal If set to true, this network won't be able to connect to the outside world.
+     * Every network the daemon knows, each one ready to work with: id filled in and state
+     * [Network.State.Created], so [Network.remove] works on it right away.
      */
-    suspend fun createNetwork(
-        name: String,
-        driver: NetworkDriver = NetworkDriver.Bridge,
-        scope: NetworkScope = NetworkScope.Local,
-        ipamConfigs: List<IpamConfig>? = null,
-        internal: Boolean = false,
-        attachable: Boolean = true,
-        enableIPv4: Boolean = true,
-        enableIPv6: Boolean = true,
-        labels: Map<String, String> = emptyMap()
-    ) {
-        internalCreateNetworkRequest(
-            dockerClient = client,
-            name = name,
-            driver = driver,
-            scope = scope,
-            ipamConfigs = ipamConfigs,
-            internal = internal,
-            attachable = attachable,
-            enableIPv4 = enableIPv4,
-            enableIPv6 = enableIPv6,
-            labels = labels,
-        )
-    }
-
     suspend fun getNetworks(): List<Network> =
         internalGetNetworksRequest(client)
 
-    suspend fun removeNetwork(id: String) =
-        internalDeleteNetworkRequest(client, id)
+    /**
+     * Looks up a single network, the same way [getNetworks] hands them out.
+     *
+     * @return null if the daemon does not know that id
+     */
+    suspend fun getById(id: String): Network? =
+        internalGetNetworkByIdRequest(client, id)
 }

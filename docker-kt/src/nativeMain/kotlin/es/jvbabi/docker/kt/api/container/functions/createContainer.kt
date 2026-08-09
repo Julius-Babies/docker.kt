@@ -5,6 +5,7 @@ import es.jvbabi.docker.kt.api.Container.NetworkConfig
 import es.jvbabi.docker.kt.api.Container.VolumeBind
 import es.jvbabi.docker.kt.api.image.ImageNotFoundException
 import es.jvbabi.docker.kt.docker.DockerClient
+import io.ktor.client.call.body
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -69,7 +70,7 @@ internal suspend fun createContainerInternal(
     networkConfigs: List<NetworkConfig>,
     cmd: List<String>?,
     entrypoint: List<String>?
-) {
+): String {
     val binds = volumeBinds.map { bind ->
         val mountPath = when (bind) {
             is VolumeBind.Host -> "${bind.path}:${bind.containerPath}"
@@ -126,7 +127,7 @@ internal suspend fun createContainerInternal(
         if (name != null) parameters.append("name", name)
     }
 
-    dockerClient.socket.preparePost(url.build()) {
+    return dockerClient.socket.preparePost(url.build()) {
         contentType(ContentType.Application.Json)
         setBody(request)
     }.execute { response ->
@@ -138,5 +139,13 @@ internal suspend fun createContainerInternal(
         if (!response.status.isSuccess()) {
             throw RuntimeException("Failed to create container: ${response.status.value} ${response.bodyAsText()}")
         }
+
+        response.body<CreateContainerResponse>().id
     }
 }
+
+@Serializable
+private data class CreateContainerResponse(
+    @SerialName("Id") val id: String,
+    @SerialName("Warnings") val warnings: List<String> = emptyList()
+)

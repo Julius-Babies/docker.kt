@@ -7,6 +7,7 @@ import es.jvbabi.docker.kt.docker.DockerClient
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.Duration.Companion.seconds
 
 class ContainerApi internal constructor(private val client: DockerClient) {
@@ -20,45 +21,96 @@ class ContainerApi internal constructor(private val client: DockerClient) {
     suspend fun getContainers(all: Boolean = false): List<DockerContainer> = getContainers(client, all)
 
     /**
-     * Creates a new container.
+     * Looks up an existing container and hands it back as a [Container] that can be worked with -
+     * its id filled in and its state read from the daemon, so [Container.remove] works on it
+     * right away.
      *
-     * Not part of the public API: containers are configured through [DockerClient.containerBuilder]
-     * and created through [Container.create].
-     *
-     * @param image The image to use for the container (e.g., "nginx:latest")
-     * @param name Optional name for the container
-     * @param volumeBinds Volume bindings, each carrying its own container path
-     * @param environment Map of environment variables: key to value
-     * @param labels Map of labels: key to value
-     * @param exposedPorts Ports to expose without host binding, per container port the protocols
-     * @throws es.jvbabi.docker.kt.api.image.ImageNotFoundException if the specified image does not exist
+     * @return null if the daemon does not know that id
      */
-    internal suspend fun createContainer(
-        image: String,
-        name: String? = null,
-        healthCheck: Container.Healthcheck? = null,
-        volumeBinds: List<Container.VolumeBind> = emptyList(),
-        environment: Map<String, String> = emptyMap(),
-        labels: Map<String, String> = emptyMap(),
-        ports: List<Container.PortBinding> = emptyList(),
-        exposedPorts: Map<Int, Set<Container.PortBinding.Protocol>> = emptyMap(),
-        networkConfigs: List<Container.NetworkConfig> = emptyList(),
-        entrypoint: List<String>? = null,
-        cmd: List<String>? = null
-    ) = createContainerInternal(
-        dockerClient = client,
-        image = image,
-        name = name,
-        healthCheck = healthCheck,
-        volumeBinds = volumeBinds,
-        environment = environment,
-        labels = labels,
-        ports = ports,
-        exposedPorts = exposedPorts,
-        networkConfigs = networkConfigs,
-        cmd = cmd,
-        entrypoint = entrypoint,
-    )
+    suspend fun getById(id: String): Container? {
+        val inspect = inspectContainerOrNull(client, id) ?: return null
+
+        return Container(
+            client = client,
+            image = inspect.config.image,
+            // Inspect reports the name with a leading slash, the builder takes it without.
+            name = inspect.name?.trimStart('/'),
+            healthCheck = inspect.config.healthcheck?.let { healthcheck ->
+                Container.Healthcheck(
+                    test = healthcheck.test,
+                    interval = healthcheck.interval.nanoseconds,
+                    timeout = healthcheck.timeout.nanoseconds,
+                    startPeriod = healthcheck.startPeriod.nanoseconds,
+                    retries = healthcheck.retries
+                )
+            },
+            entrypoint = inspect.config.entrypoint,
+            cmd = inspect.config.cmd,
+            volumes = inspect.mounts.map { mount ->
+                if (mount.type == "volume") {
+                    Container.VolumeBind.Volume(
+                        name = mount.name.orEmpty(),
+                        containerPath = mount.destination,
+                        readOnly = !mount.rw
+                    )
+                } else {
+                    Container.VolumeBind.Host(
+                        path = mount.source,
+                        containerPath = mount.destination,
+                        readOnly = !mount.rw
+                    )
+                }
+            },
+            environment = inspect.config.env.associate { entry ->
+                // Values may contain '=' themselves, so only split on the first one.
+                entry.substringBefore('=') to entry.substringAfter('=', "")
+            },
+            labels = inspect.config.labels,
+            ports = inspect.hostConfig.portBindings.flatMap { (port, bindings) ->
+                val (containerPort, protocol) = port.toPortAndProtocol()
+                bindings.map { binding ->
+                    Container.PortBinding(
+                        hostPort = binding.hostPort.toInt(),
+                        containerPort = containerPort,
+                        protocol = protocol
+                    )
+                }
+            },
+            exposedPorts = inspect.config.exposedPorts.keys
+                .map { it.toPortAndProtocol() }
+                .groupBy({ (port, _) -> port }, { (_, protocol) -> protocol })
+                .mapValues { (_, protocols) -> protocols.toSet() },
+            networks = inspect.networkSettings.networks.map { (_, endpoint) ->
+                Container.NetworkConfig(
+                    networkId = endpoint.networkId,
+                    aliases = endpoint.aliases.orEmpty()
+                )
+            }
+        ).apply {
+            this.id = inspect.id
+            state = inspect.state.status.toContainerState()
+        }
+    }
+
+    /** Parses Docker's `"80/tcp"` port notation. */
+    private fun String.toPortAndProtocol(): Pair<Int, Container.PortBinding.Protocol> =
+        substringBefore('/').toInt() to
+            Container.PortBinding.Protocol.valueOf(substringAfter('/', "tcp").uppercase())
+
+    /**
+     * Maps the status Docker reports onto the states [Container] distinguishes. Docker knows a few
+     * transient ones on top: a container on its way up counts as running, one on its way out or
+     * already gone as stopped.
+     */
+    private fun String.toContainerState(): Container.State =
+        when (ContainerState.fromString(this)) {
+            ContainerState.CREATED -> Container.State.Existing.Created
+            ContainerState.RUNNING, ContainerState.RESTARTING -> Container.State.Existing.Running
+            ContainerState.PAUSED -> Container.State.Existing.Paused
+            ContainerState.EXITED, ContainerState.DEAD, ContainerState.REMOVING ->
+                Container.State.Existing.Stopped
+            null -> throw RuntimeException("Unknown container state: $this")
+        }
 
     /**
      * Starts a container.

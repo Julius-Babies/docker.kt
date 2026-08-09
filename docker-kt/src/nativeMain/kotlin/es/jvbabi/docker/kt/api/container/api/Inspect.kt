@@ -7,11 +7,14 @@ import kotlinx.serialization.Serializable
 data class Inspect(
     @SerialName("Id") val id: String,
     @SerialName("Names") val names: List<String>? = null,
+    /** Inspect reports a single name, with a leading slash, rather than the list [names] carries. */
+    @SerialName("Name") val name: String? = null,
     @SerialName("Image") val image: String,
     @SerialName("State") val state: ContainerState,
     @SerialName("Config") val config: ContainerConfig,
     @SerialName("HostConfig") val hostConfig: HostConfig,
-    @SerialName("NetworkSettings") val networkSettings: InspectNetworkSettings
+    @SerialName("NetworkSettings") val networkSettings: InspectNetworkSettings,
+    @SerialName("Mounts") val mounts: List<Mount> = emptyList()
 )
 
 @Serializable
@@ -58,10 +61,22 @@ data class ContainerConfig(
     @SerialName("StdinOnce") val stdinOnce: Boolean,
     @SerialName("Env") val env: List<String>,
     @SerialName("Cmd") val cmd: List<String>?,
+    @SerialName("Entrypoint") val entrypoint: List<String>? = null,
+    @SerialName("Healthcheck") val healthcheck: InspectHealthcheck? = null,
     @SerialName("Image") val image: String,
     @SerialName("Labels") val labels: Map<String, String>,
     @SerialName("WorkingDir") val workingDir: String,
     @SerialName("NetworkMode") val networkMode: String? = null
+)
+
+/** Durations are reported in nanoseconds. */
+@Serializable
+data class InspectHealthcheck(
+    @SerialName("Test") val test: List<String> = emptyList(),
+    @SerialName("Interval") val interval: Long = 0,
+    @SerialName("Timeout") val timeout: Long = 0,
+    @SerialName("StartPeriod") val startPeriod: Long = 0,
+    @SerialName("Retries") val retries: Int = 0
 )
 
 @Serializable

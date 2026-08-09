@@ -1,10 +1,9 @@
 package es.jvbabi.docker.kt.api.network.functions
 
-import es.jvbabi.docker.kt.api.network.IpamConfig
-import es.jvbabi.docker.kt.api.network.NetworkDriver
-import es.jvbabi.docker.kt.api.network.NetworkScope
+import es.jvbabi.docker.kt.api.Network
 import es.jvbabi.docker.kt.docker.DockerClient
 import es.jvbabi.docker.kt.util.Optional
+import io.ktor.client.call.body
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -31,36 +30,45 @@ internal data class CreateNetworkRequest(
         @Serializable
         data class IpamConfig(
             @SerialName("Subnet") val subnet: String,
-            @SerialName("IPRange") val ipRange: String,
+            @SerialName("IPRange") val ipRange: String? = null,
             @SerialName("Gateway") val gateway: String,
             @SerialName("AuxiliaryAddresses") val auxiliaryAddresses: Map<String, String> = emptyMap(),
         )
     }
 }
 
+@Serializable
+internal data class CreateNetworkResponse(
+    @SerialName("Id") val id: String,
+    @SerialName("Warning") val warning: String? = null
+)
+
+/**
+ * @return the id the daemon assigned to the new network
+ */
 internal suspend fun internalCreateNetworkRequest(
     dockerClient: DockerClient,
     name: String,
-    driver: NetworkDriver = NetworkDriver.Bridge,
-    scope: NetworkScope = NetworkScope.Local,
-    ipamConfigs: List<IpamConfig>?,
+    driver: Network.Driver = Network.Driver.Bridge,
+    scope: Network.Scope = Network.Scope.Local,
+    ipamConfigs: List<Network.IpamConfig>?,
     internal: Boolean,
     attachable: Boolean,
     enableIPv4: Boolean,
     enableIPv6: Boolean,
     labels: Map<String, String>
-) {
+): String {
     val request = CreateNetworkRequest(
         name = name,
         driver = when (driver) {
-            NetworkDriver.Bridge -> "bridge"
-            NetworkDriver.Overlay -> "overlay"
-            NetworkDriver.Host -> "host"
-            NetworkDriver.Null -> "null"
+            Network.Driver.Bridge -> "bridge"
+            Network.Driver.Overlay -> "overlay"
+            Network.Driver.Host -> "host"
+            Network.Driver.Null -> "null"
         },
         scope = when (scope) {
-            NetworkScope.Local -> "local"
-            NetworkScope.Swarm -> "swarm"
+            Network.Scope.Local -> "local"
+            Network.Scope.Swarm -> "swarm"
         },
         internal = internal,
         attachable = attachable,
@@ -88,12 +96,14 @@ internal suspend fun internalCreateNetworkRequest(
         pathSegments = listOf("networks", "create")
     }
 
-    dockerClient.socket.preparePost(url.build()) {
+    return dockerClient.socket.preparePost(url.build()) {
         contentType(ContentType.Application.Json)
         setBody(request)
     }.execute { response ->
         if (!response.status.isSuccess()) {
             throw RuntimeException("Failed to create network: ${response.status.value} ${response.bodyAsText()}")
         }
+
+        response.body<CreateNetworkResponse>().id
     }
 }

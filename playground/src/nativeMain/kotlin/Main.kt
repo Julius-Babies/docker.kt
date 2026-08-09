@@ -25,8 +25,7 @@ fun main() {
 
             println("\n=== Networks ===")
             val networks = dockerClient.networks.getNetworks()
-            val testId = networks.find { it.name == "testnetwork" }?.id
-            if (testId != null) dockerClient.networks.removeNetwork(testId)
+            networks.find { it.name == "testnetwork" }?.remove()
 
             println("\n=== Containers ===")
             val containers = dockerClient.containers.getContainers(all = true)
@@ -37,14 +36,17 @@ fun main() {
             println("Creating test container...")
             var containerId = dockerClient.containers.getContainers(all = true)
                 .firstOrNull { it.names.contains("/testcontainer") }?.id
-            if (containerId == null) dockerClient.containers.createContainer(
-                image = "postgres:18.1-alpine3.22",
-                volumeBinds = mapOf(
-                    Container.VolumeBind.Host(getSocketPath()) to "/var/run/docker.sock"
-                ),
-                name = "testcontainer",
-                environment = mapOf("POSTGRES_PASSWORD" to "testpw")
-            )
+            if (containerId == null) dockerClient.containerBuilder("postgres:18.1-alpine3.22") {
+                name = "testcontainer"
+
+                volumes {
+                    bindHost(getSocketPath(), "/var/run/docker.sock")
+                }
+
+                environment {
+                    put("POSTGRES_PASSWORD", "testpw")
+                }
+            }.create()
             containerId = dockerClient.containers.getContainers(all = true).firstOrNull { it.names.contains("/testcontainer") }?.id
             requireNotNull(containerId)
             coroutineScope {

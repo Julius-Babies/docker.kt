@@ -1,5 +1,7 @@
 package es.jvbabi.docker.kt.api
 
+import es.jvbabi.docker.kt.api.container.functions.createContainerInternal
+import es.jvbabi.docker.kt.api.container.functions.deleteContainer
 import es.jvbabi.docker.kt.docker.DockerClient
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -19,6 +21,13 @@ class Container internal constructor(
     val networks: List<NetworkConfig>
 ) {
     lateinit var state: State
+
+    /**
+     * The id the daemon assigned. Only readable once the container exists, so guard on [state]
+     * before reaching for it.
+     */
+    lateinit var id: String
+        internal set
 
     sealed class State {
         sealed class NonExisting : State() {
@@ -47,7 +56,8 @@ class Container internal constructor(
             "Only a draft can be created, but this container is $state"
         }
 
-        client.containers.createContainer(
+        id = createContainerInternal(
+            dockerClient = client,
             image = image,
             name = name,
             healthCheck = healthCheck,
@@ -62,6 +72,22 @@ class Container internal constructor(
         )
 
         state = State.Existing.Created
+    }
+
+    /**
+     * Removes this container from the daemon.
+     *
+     * Only an existing container can be removed - a draft was never sent anywhere, and a deleted one
+     * no longer owns its id. Note that Docker refuses to remove a container that is still running.
+     */
+    suspend fun remove() {
+        check(state is State.Existing) {
+            "Only an existing container can be removed, but this container is $state"
+        }
+
+        deleteContainer(client, id)
+
+        state = State.NonExisting.Deleted
     }
 
     class Builder internal constructor(val client: DockerClient, val image: String) {

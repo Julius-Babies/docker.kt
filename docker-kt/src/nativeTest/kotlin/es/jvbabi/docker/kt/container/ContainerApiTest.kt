@@ -51,18 +51,19 @@ class ContainerApiTest : FunSpec({
             // Cleanup vorheriger Test-Container
             cleanupTestContainer(client, testContainerName)
 
-            client.containers.createContainer(
-                image = testImageName,
-                name = testContainerName,
-                environment = mapOf(
-                    "TEST_VAR" to "test_value",
-                    "ANOTHER_VAR" to "another_value"
-                ),
-                labels = mapOf(
-                    "test" to "true",
-                    "created-by" to "kotest"
-                )
-            )
+            client.containerBuilder(testImageName) {
+                name = testContainerName
+
+                environment {
+                    put("TEST_VAR", "test_value")
+                    put("ANOTHER_VAR", "another_value")
+                }
+
+                labels {
+                    put("test", "true")
+                    put("created-by", "kotest")
+                }
+            }.create()
 
             val containers = client.containers.getContainers(all = true)
             val createdContainer = containers.find {
@@ -83,10 +84,9 @@ class ContainerApiTest : FunSpec({
     test("Create container with non-existent image - should throw ImageNotFoundException") {
         DockerClient().use { client ->
             val exception = shouldThrow<ImageNotFoundException> {
-                client.containers.createContainer(
-                    image = "non-existent-image-12345:latest",
+                client.containerBuilder("non-existent-image-12345:latest") {
                     name = "should-not-exist"
-                )
+                }.create()
             }
 
             exception.message shouldContain "Image not found"
@@ -99,10 +99,7 @@ class ContainerApiTest : FunSpec({
             cleanupTestContainer(client, testContainerName)
 
             // Create container
-            client.containers.createContainer(
-                image = testImageName,
-                name = testContainerName
-            )
+            client.containerBuilder(testImageName) { name = testContainerName }.create()
 
             var container = findContainer(client, testContainerName)
             container shouldNotBe null
@@ -129,10 +126,7 @@ class ContainerApiTest : FunSpec({
             cleanupTestContainer(client, testContainerName)
 
             // Create and start container
-            client.containers.createContainer(
-                image = testImageName,
-                name = testContainerName
-            )
+            client.containerBuilder(testImageName) { name = testContainerName }.create()
             var container = findContainer(client, testContainerName)!!
             client.containers.startContainer(container.id)
 
@@ -153,10 +147,7 @@ class ContainerApiTest : FunSpec({
             cleanupTestContainer(client, testContainerName)
 
             // Create and start container
-            client.containers.createContainer(
-                image = testImageName,
-                name = testContainerName
-            )
+            client.containerBuilder(testImageName) { name = testContainerName }.create()
             var container = findContainer(client, testContainerName)!!
             client.containers.startContainer(container.id)
 
@@ -182,10 +173,7 @@ class ContainerApiTest : FunSpec({
             cleanupTestContainer(client, testContainerName)
 
             // Create container
-            client.containers.createContainer(
-                image = testImageName,
-                name = testContainerName
-            )
+            client.containerBuilder(testImageName) { name = testContainerName }.create()
 
             var container = findContainer(client, testContainerName)
             container shouldNotBe null
@@ -205,14 +193,14 @@ class ContainerApiTest : FunSpec({
             cleanupTestContainer(client, volumeTestName)
 
             // Create with volume bind
-            client.containers.createContainer(
-                image = testImageName,
-                name = volumeTestName,
-                volumeBinds = listOf(
-                    Container.VolumeBind.Volume("my-test-volume", "/data"),
-                    Container.VolumeBind.Host("/tmp", "/host-tmp")
-                )
-            )
+            client.containerBuilder(testImageName) {
+                name = volumeTestName
+
+                volumes {
+                    bindVolume("my-test-volume", "/data")
+                    bindHost("/tmp", "/host-tmp")
+                }
+            }.create()
 
             val container = findContainer(client, volumeTestName)
             container shouldNotBe null
