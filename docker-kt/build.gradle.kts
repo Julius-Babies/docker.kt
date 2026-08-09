@@ -55,6 +55,9 @@ kotlin {
         nativeTest.dependencies {
             implementation(libs.kotest.framework.engine)
             implementation(libs.kotest.assertions.core)
+
+            // Used by the tests to build and clean up their own temp directories.
+            implementation(libs.kfile)
         }
     }
 
