@@ -66,11 +66,13 @@ class ContainerNetworkAttachmentTest : FunSpec({
     test("a fresh container is on the default bridge only") {
         attachedNetworkNames() shouldBe setOf("bridge")
 
-        // The object tracks the networks it was wired up with, not the bridge Docker attaches on
-        // its own - that one only shows up when the container is read back from the daemon.
+        // Built locally, so it only knows what it was configured with - not the bridge the daemon
+        // attached on its own.
         container.networks.shouldBeEmpty()
-        client.containers.getById(container.id).shouldNotBeNull()
-            .networks.map { it.network.name } shouldBe listOf("bridge")
+
+        // Reading it back is what brings the daemon's view in.
+        container.refresh()
+        container.networks.map { it.network.name } shouldBe listOf("bridge")
     }
 
     test("connectTo attaches the container from the container's side") {
@@ -83,7 +85,8 @@ class ContainerNetworkAttachmentTest : FunSpec({
         endpoint.aliases.shouldNotBeNull() shouldContain "from-container"
 
         // The container's own view was updated along with the daemon's.
-        container.networks.map { it.network.id } shouldContain viaContainer.id
+        container.networks.map { it.network.name } shouldContainExactlyInAnyOrder
+            listOf("bridge", fromContainerName)
     }
 
     test("connect attaches the container from the network's side") {
@@ -95,22 +98,37 @@ class ContainerNetworkAttachmentTest : FunSpec({
             .networkSettings.networks[fromNetworkName].shouldNotBeNull()
         endpoint.aliases.shouldNotBeNull() shouldContain "from-network"
 
-        container.networks.map { it.network.id } shouldContainExactlyInAnyOrder
-            listOf(viaContainer.id, viaNetwork.id)
+        container.networks.map { it.network.name } shouldContainExactlyInAnyOrder
+            listOf("bridge", fromContainerName, fromNetworkName)
     }
 
     test("disconnectFrom detaches the container from the container's side") {
         container.disconnectFrom(viaContainer)
 
         attachedNetworkNames() shouldNotContain fromContainerName
-        container.networks.map { it.network.id } shouldBe listOf(viaNetwork.id)
+        container.networks.map { it.network.name } shouldContainExactlyInAnyOrder
+            listOf("bridge", fromNetworkName)
     }
 
     test("disconnect detaches the container from the network's side") {
         viaNetwork.disconnect(container)
 
         attachedNetworkNames() shouldNotContain fromNetworkName
-        container.networks.shouldBeEmpty()
+        container.networks.map { it.network.name } shouldBe listOf("bridge")
+    }
+
+    test("refresh picks up what another handle on the same container did") {
+        val otherHandle = client.containers.getById(container.id).shouldNotBeNull()
+        otherHandle.connectTo(viaContainer)
+
+        // This handle knows nothing about it yet...
+        container.networks.map { it.network.name } shouldBe listOf("bridge")
+
+        container.refresh()
+        container.networks.map { it.network.name } shouldContainExactlyInAnyOrder
+            listOf("bridge", fromContainerName)
+
+        container.disconnectFrom(viaContainer)
     }
 
     test("attaching to a network that does not exist yet is refused") {
@@ -119,8 +137,8 @@ class ContainerNetworkAttachmentTest : FunSpec({
         shouldThrow<IllegalStateException> { container.connectTo(draft) }
         shouldThrow<IllegalStateException> { draft.connect(container) }
 
-        // Nothing reached the daemon, so neither side moved.
-        container.networks.shouldBeEmpty()
+        // Nothing reached the daemon, so the container is still only on its bridge.
+        container.networks.map { it.network.name } shouldBe listOf("bridge")
     }
 
     test("attaching a container that does not exist yet is refused") {

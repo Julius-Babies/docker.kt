@@ -5,18 +5,51 @@ import es.jvbabi.docker.kt.api.network.functions.internalDeleteNetworkRequest
 import es.jvbabi.docker.kt.docker.DockerClient
 import kotlin.time.Instant
 
+/**
+ * A network, as configured locally or as the daemon reports it.
+ *
+ * Every property below is the state as of the last read: what the builder was given for a draft,
+ * what the daemon said for one that exists. [refresh] brings them up to date again, and the
+ * operations on this class do that for themselves before they act.
+ */
 class Network internal constructor(
     internal val client: DockerClient,
-    val name: String,
-    val driver: Driver,
-    val scope: Scope,
-    val internal: Boolean,
-    val attachable: Boolean,
-    val enableIpv4: Boolean,
-    val enableIpv6: Boolean,
-    val ipamConfigs: List<IpamConfig>,
-    val labels: Map<String, String>
+    name: String,
+    driver: Driver,
+    scope: Scope,
+    internal: Boolean,
+    attachable: Boolean,
+    enableIpv4: Boolean,
+    enableIpv6: Boolean,
+    ipamConfigs: List<IpamConfig>,
+    labels: Map<String, String>
 ) {
+    var name: String = name
+        private set
+
+    var driver: Driver = driver
+        private set
+
+    var scope: Scope = scope
+        private set
+
+    var internal: Boolean = internal
+        private set
+
+    var attachable: Boolean = attachable
+        private set
+
+    var enableIpv4: Boolean = enableIpv4
+        private set
+
+    var enableIpv6: Boolean = enableIpv6
+        private set
+
+    var ipamConfigs: List<IpamConfig> = ipamConfigs
+        private set
+
+    var labels: Map<String, String> = labels
+        private set
 
     lateinit var state: State
 
@@ -69,6 +102,33 @@ class Network internal constructor(
     }
 
     /**
+     * Re-reads this network from the daemon, so every property reflects it again.
+     *
+     * A draft has nothing to read - it only exists here. One that has been removed in the meantime,
+     * by someone else or by another handle on it, becomes [State.Deleted].
+     */
+    suspend fun refresh() {
+        if (state !is State.Created) return
+
+        val fresh = client.networks.getById(id)
+        if (fresh == null) {
+            state = State.Deleted
+            return
+        }
+
+        name = fresh.name
+        driver = fresh.driver
+        scope = fresh.scope
+        internal = fresh.internal
+        attachable = fresh.attachable
+        enableIpv4 = fresh.enableIpv4
+        enableIpv6 = fresh.enableIpv6
+        ipamConfigs = fresh.ipamConfigs
+        labels = fresh.labels
+        created = fresh.created
+    }
+
+    /**
      * Attaches [container] to this network, optionally under [aliases] that other containers on
      * this network can reach it by.
      *
@@ -94,6 +154,7 @@ class Network internal constructor(
      * deleted one no longer owns its id.
      */
     suspend fun remove() {
+        refresh()
         check(state is State.Created) {
             "Only an existing network can be removed, but this network is $state"
         }

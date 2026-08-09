@@ -108,6 +108,19 @@ class NetworkLifecycleTest : FunSpec({
         client.networks.getNetworks().none { it.name == networkName } shouldBe true
     }
 
+    test("refresh notices a network that was removed through another handle") {
+        val other = client.networkBuilder(testResourceName("network-refresh")).apply { create() }
+        val handle = client.networks.getById(other.id).shouldNotBeNull()
+
+        handle.remove()
+
+        // The first object still believes what it last saw.
+        other.state shouldBeSameInstanceAs Network.State.Created
+
+        other.refresh()
+        other.state shouldBeSameInstanceAs Network.State.Deleted
+    }
+
     test("a removed network can neither be removed nor created again") {
         // Both guards read the same state, so neither call reaches the daemon.
         shouldThrow<IllegalStateException> { network.remove() }

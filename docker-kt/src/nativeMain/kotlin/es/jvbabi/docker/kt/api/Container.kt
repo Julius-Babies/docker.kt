@@ -8,22 +8,60 @@ import es.jvbabi.docker.kt.docker.DockerClient
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
+/**
+ * A container, as configured locally or as the daemon reports it.
+ *
+ * Every property below is the state as of the last read: what the builder was given for a draft,
+ * what the daemon said for one that exists. [refresh] brings them up to date again, and the
+ * operations on this class do that for themselves before they act.
+ */
 class Container internal constructor(
     internal val client: DockerClient,
-    val image: String,
-    val name: String?,
-    val healthCheck: Healthcheck?,
-    val entrypoint: List<String>?,
-    val cmd: List<String>?,
-    val volumes: List<VolumeBind>,
-    val environment: Map<String, String>,
-    val labels: Map<String, String>,
-    val ports: List<PortBinding>,
-    val exposedPorts: Map<Int, Set<PortBinding.Protocol>>,
+    image: String,
+    name: String?,
+    healthCheck: Healthcheck?,
+    entrypoint: List<String>?,
+    cmd: List<String>?,
+    volumes: List<VolumeBind>,
+    environment: Map<String, String>,
+    labels: Map<String, String>,
+    ports: List<PortBinding>,
+    exposedPorts: Map<Int, Set<PortBinding.Protocol>>,
     networks: List<NetworkConfig>
 ) {
+    var image: String = image
+        private set
+
+    var name: String? = name
+        private set
+
+    var healthCheck: Healthcheck? = healthCheck
+        private set
+
+    var entrypoint: List<String>? = entrypoint
+        private set
+
+    var cmd: List<String>? = cmd
+        private set
+
+    var volumes: List<VolumeBind> = volumes
+        private set
+
+    var environment: Map<String, String> = environment
+        private set
+
+    var labels: Map<String, String> = labels
+        private set
+
+    var ports: List<PortBinding> = ports
+        private set
+
+    var exposedPorts: Map<Int, Set<PortBinding.Protocol>> = exposedPorts
+        private set
+
     /**
-     * The networks this container is attached to. Kept in step by [connectTo] and [disconnectFrom].
+     * The networks this container is attached to. Once refreshed this includes the bridge the daemon
+     * attaches on its own, which a freshly built container does not know about.
      */
     var networks: List<NetworkConfig> = networks
         private set
@@ -91,12 +129,43 @@ class Container internal constructor(
     }
 
     /**
+     * Re-reads this container from the daemon, so every property reflects it again.
+     *
+     * A draft has nothing to read - it only exists here. One that has been removed in the meantime,
+     * by someone else or by another handle on it, becomes [State.NonExisting.Deleted].
+     */
+    suspend fun refresh() {
+        if (state is State.NonExisting) return
+
+        val fresh = client.containers.getById(id)
+        if (fresh == null) {
+            state = State.NonExisting.Deleted
+            return
+        }
+
+        image = fresh.image
+        name = fresh.name
+        healthCheck = fresh.healthCheck
+        entrypoint = fresh.entrypoint
+        cmd = fresh.cmd
+        volumes = fresh.volumes
+        environment = fresh.environment
+        labels = fresh.labels
+        ports = fresh.ports
+        exposedPorts = fresh.exposedPorts
+        networks = fresh.networks
+        state = fresh.state
+    }
+
+    /**
      * Attaches this container to [network], optionally under [aliases] that other containers on
      * that network can reach it by.
      *
      * Both sides have to exist: the container is named by its id, the network addressed by its own.
      */
     suspend fun connectTo(network: Network, aliases: List<String> = emptyList()) {
+        refresh()
+        network.refresh()
         checkAttachable(network)
 
         internalConnectNetworkRequest(
@@ -115,6 +184,8 @@ class Container internal constructor(
      * @param force detaches it even while it is running
      */
     suspend fun disconnectFrom(network: Network, force: Boolean = false) {
+        refresh()
+        network.refresh()
         checkAttachable(network)
 
         internalDisconnectNetworkRequest(
@@ -143,6 +214,7 @@ class Container internal constructor(
      * no longer owns its id. Note that Docker refuses to remove a container that is still running.
      */
     suspend fun remove() {
+        refresh()
         check(state is State.Existing) {
             "Only an existing container can be removed, but this container is $state"
         }
