@@ -1,5 +1,6 @@
 package es.jvbabi.docker.kt.api.container
 
+import es.jvbabi.docker.kt.api.Container
 import es.jvbabi.docker.kt.api.container.api.DockerContainer
 import es.jvbabi.docker.kt.api.container.functions.*
 import es.jvbabi.docker.kt.docker.DockerClient
@@ -21,23 +22,26 @@ class ContainerApi internal constructor(private val client: DockerClient) {
     /**
      * Creates a new container.
      *
+     * Not part of the public API: containers are configured through [DockerClient.containerBuilder]
+     * and created through [Container.create].
+     *
      * @param image The image to use for the container (e.g., "nginx:latest")
      * @param name Optional name for the container
-     * @param volumeBinds Map of volume bindings: [Container.VolumeBind] to container path
+     * @param volumeBinds Volume bindings, each carrying its own container path
      * @param environment Map of environment variables: key to value
      * @param labels Map of labels: key to value
-     * @param exposedPorts List of ports to expose without host binding
+     * @param exposedPorts Ports to expose without host binding, per container port the protocols
      * @throws es.jvbabi.docker.kt.api.image.ImageNotFoundException if the specified image does not exist
      */
-    suspend fun createContainer(
+    internal suspend fun createContainer(
         image: String,
         name: String? = null,
         healthCheck: Container.Healthcheck? = null,
-        volumeBinds: Map<Container.VolumeBind, String> = emptyMap(),
+        volumeBinds: List<Container.VolumeBind> = emptyList(),
         environment: Map<String, String> = emptyMap(),
         labels: Map<String, String> = emptyMap(),
         ports: List<Container.PortBinding> = emptyList(),
-        exposedPorts: Map<Int, Container.PortBinding.Protocol> = emptyMap(),
+        exposedPorts: Map<Int, Set<Container.PortBinding.Protocol>> = emptyMap(),
         networkConfigs: List<Container.NetworkConfig> = emptyList(),
         entrypoint: List<String>? = null,
         cmd: List<String>? = null

@@ -1,6 +1,6 @@
 package es.jvbabi.docker.kt.container
 
-import es.jvbabi.docker.kt.api.container.Container
+import es.jvbabi.docker.kt.api.Container
 import es.jvbabi.docker.kt.api.container.ContainerState
 import io.kotest.assertions.throwables.shouldThrowAny
 import io.kotest.core.spec.style.FunSpec
@@ -42,17 +42,32 @@ class ContainerParsingTest : FunSpec({
     }
 
     context("VolumeBind.from") {
-        test("maps a host path onto a container path") {
+        test("reads an absolute source as a host path") {
             Container.VolumeBind.from("/srv/data:/app/data") shouldBe
-                (Container.VolumeBind.Host("/srv/data") to "/app/data")
+                Container.VolumeBind.Host("/srv/data", "/app/data")
+        }
+
+        test("reads a relative source as a host path too") {
+            Container.VolumeBind.from("./data:/app/data") shouldBe
+                Container.VolumeBind.Host("./data", "/app/data")
+        }
+
+        test("reads a source that is no path at all as a named volume") {
+            Container.VolumeBind.from("app-data:/app/data") shouldBe
+                Container.VolumeBind.Volume("app-data", "/app/data")
         }
 
         test("reads the read-only flag from the third segment") {
             Container.VolumeBind.from("/srv/data:/app/data:ro") shouldBe
-                (Container.VolumeBind.Host("/srv/data", readOnly = true) to "/app/data")
+                Container.VolumeBind.Host("/srv/data", "/app/data", readOnly = true)
 
             Container.VolumeBind.from("/srv/data:/app/data:rw") shouldBe
-                (Container.VolumeBind.Host("/srv/data", readOnly = false) to "/app/data")
+                Container.VolumeBind.Host("/srv/data", "/app/data", readOnly = false)
+        }
+
+        test("carries the read-only flag over to a named volume") {
+            Container.VolumeBind.from("app-data:/app/data:ro") shouldBe
+                Container.VolumeBind.Volume("app-data", "/app/data", readOnly = true)
         }
 
         test("rejects a bind without a container path") {

@@ -1,6 +1,6 @@
 package es.jvbabi.docker.kt.container
 
-import es.jvbabi.docker.kt.api.container.Container
+import es.jvbabi.docker.kt.api.Container
 import es.jvbabi.docker.kt.api.container.ContainerState
 import es.jvbabi.docker.kt.api.image.ImageNotFoundException
 import es.jvbabi.docker.kt.docker.DockerClient
@@ -208,9 +208,9 @@ class ContainerApiTest : FunSpec({
             client.containers.createContainer(
                 image = testImageName,
                 name = volumeTestName,
-                volumeBinds = mapOf(
-                    Container.VolumeBind.Volume("my-test-volume") to "/data",
-                    Container.VolumeBind.Host("/tmp") to "/host-tmp"
+                volumeBinds = listOf(
+                    Container.VolumeBind.Volume("my-test-volume", "/data"),
+                    Container.VolumeBind.Host("/tmp", "/host-tmp")
                 )
             )
 

@@ -1,8 +1,8 @@
 package es.jvbabi.docker.kt.api.container.functions
 
-import es.jvbabi.docker.kt.api.container.Container
-import es.jvbabi.docker.kt.api.container.Container.NetworkConfig
-import es.jvbabi.docker.kt.api.container.Container.VolumeBind
+import es.jvbabi.docker.kt.api.Container
+import es.jvbabi.docker.kt.api.Container.NetworkConfig
+import es.jvbabi.docker.kt.api.Container.VolumeBind
 import es.jvbabi.docker.kt.api.image.ImageNotFoundException
 import es.jvbabi.docker.kt.docker.DockerClient
 import io.ktor.client.request.*
@@ -61,19 +61,19 @@ internal suspend fun createContainerInternal(
     image: String,
     name: String?,
     healthCheck: Container.Healthcheck?,
-    volumeBinds: Map<VolumeBind, String>,
+    volumeBinds: List<VolumeBind>,
     environment: Map<String, String>,
     labels: Map<String, String>,
     ports: List<Container.PortBinding>,
-    exposedPorts: Map<Int, Container.PortBinding.Protocol>,
+    exposedPorts: Map<Int, Set<Container.PortBinding.Protocol>>,
     networkConfigs: List<NetworkConfig>,
     cmd: List<String>?,
     entrypoint: List<String>?
 ) {
-    val binds = volumeBinds.map { (bind, containerPath) ->
+    val binds = volumeBinds.map { bind ->
         val mountPath = when (bind) {
-            is VolumeBind.Host -> "${bind.path}:$containerPath"
-            is VolumeBind.Volume -> "${bind.name}:$containerPath"
+            is VolumeBind.Host -> "${bind.path}:${bind.containerPath}"
+            is VolumeBind.Volume -> "${bind.name}:${bind.containerPath}"
         }
         if (bind.readOnly) "$mountPath:ro" else mountPath
     }
@@ -88,7 +88,9 @@ internal suspend fun createContainerInternal(
     // Build exposed ports from both port mappings and explicitly exposed ports
     val allExposedPorts: Map<String, EmptyObject> = ports
         .map { "${it.containerPort}/${it.protocol.name.lowercase()}" }
-        .plus(exposedPorts.map { "${it.key}/${it.value.name.lowercase()}" })
+        .plus(exposedPorts.flatMap { (containerPort, protocols) ->
+            protocols.map { protocol -> "$containerPort/${protocol.name.lowercase()}" }
+        })
         .associateWith { EmptyObject() }
 
     val request = CreateContainerRequest(

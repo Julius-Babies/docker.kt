@@ -1,4 +1,4 @@
-import es.jvbabi.docker.kt.api.container.Container
+import es.jvbabi.docker.kt.api.Container
 import es.jvbabi.docker.kt.docker.DockerClient
 import es.jvbabi.docker.kt.docker.auth.getAuthForRegistry
 import es.jvbabi.docker.kt.docker.getSocketPath

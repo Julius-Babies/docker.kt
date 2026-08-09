@@ -1,5 +1,6 @@
 package es.jvbabi.docker.kt.docker
 
+import es.jvbabi.docker.kt.api.Container
 import es.jvbabi.docker.kt.api.container.ContainerApi
 import es.jvbabi.docker.kt.api.image.ImageApi
 import es.jvbabi.docker.kt.api.info.DockerInfo
@@ -30,6 +31,10 @@ class DockerClient: AutoCloseable {
     val images = ImageApi(this)
     val networks = NetworkApi(this)
     val containers = ContainerApi(this)
+
+    fun containerBuilder(image: String, builder: Container.Builder.() -> Unit = {}): Container {
+        return Container.Builder(this, image).apply(builder).build()
+    }
 
     suspend fun getInfo(): DockerInfo {
         val response = socket.get("/info")

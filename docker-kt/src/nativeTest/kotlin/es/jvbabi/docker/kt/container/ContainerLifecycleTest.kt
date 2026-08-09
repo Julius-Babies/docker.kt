@@ -1,15 +1,8 @@
 package es.jvbabi.docker.kt.container
 
-import es.jvbabi.docker.kt.api.container.Container
+import es.jvbabi.docker.kt.api.Container
 import es.jvbabi.docker.kt.api.container.ContainerState
-import es.jvbabi.docker.kt.support.RequiresDocker
-import es.jvbabi.docker.kt.support.containerByName
-import es.jvbabi.docker.kt.support.ensureImage
-import es.jvbabi.docker.kt.support.removeContainerQuietly
-import es.jvbabi.docker.kt.support.removeNetworkQuietly
-import es.jvbabi.docker.kt.support.removeVolumeQuietly
-import es.jvbabi.docker.kt.support.testResourceName
-import es.jvbabi.docker.kt.support.withDocker
+import es.jvbabi.docker.kt.support.*
 import es.jvbabi.kfile.File
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContain
@@ -19,6 +12,7 @@ import io.kotest.matchers.maps.shouldContainKey
 import io.kotest.matchers.maps.shouldNotContainKey
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.types.shouldBeSameInstanceAs
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.seconds
 
@@ -83,34 +77,40 @@ class ContainerLifecycleTest : FunSpec({
 
     test("creates a container with volumes, ports, labels, environment and a network") {
         withDocker { client ->
-            client.containers.createContainer(
-                image = IMAGE,
-                name = containerName,
-                healthCheck = Container.Healthcheck(test = listOf("CMD-SHELL", "true")),
-                volumeBinds = mapOf(
-                    Container.VolumeBind.Host(hostDir.absolutePath, readOnly = true) to "/mnt/host",
-                    Container.VolumeBind.Volume(volumeName) to "/mnt/volume"
-                ),
-                environment = environment,
-                labels = labels,
-                ports = listOf(
-                    Container.PortBinding(
-                        hostPort = HOST_PORT,
-                        containerPort = CONTAINER_PORT,
-                        protocol = Container.PortBinding.Protocol.TCP
-                    )
-                ),
-                exposedPorts = mapOf(EXPOSED_ONLY_PORT to Container.PortBinding.Protocol.UDP),
-                networkConfigs = listOf(
-                    Container.NetworkConfig(networkId = networkId, aliases = listOf(networkAlias))
-                ),
-                entrypoint = listOf("/bin/sh", "-c"),
-                cmd = listOf("sleep 3600")
-            )
+            val container = client.containerBuilder(IMAGE) {
+                name = containerName
+                healthCheck = Container.Healthcheck(test = listOf("CMD-SHELL", "true"))
+                entrypoint = listOf("/bin/sh", "-c")
+                cmd = listOf("/bin/sh", "-c")
 
-            val container = client.containerByName(containerName)
-            container.shouldNotBeNull()
-            container.state shouldBe ContainerState.CREATED
+                volumes {
+                    bindHost(hostDir.absolutePath, "/mnt/host", readOnly = true)
+                    bindVolume(volumeName, "/mnt/volume")
+                }
+
+                environment {
+                    putAll(environment)
+                }
+
+                labels {
+                    putAll(labels)
+                }
+
+                ports {
+                    bind(CONTAINER_PORT, HOST_PORT, setOf(Container.PortBinding.Protocol.TCP))
+                    expose(EXPOSED_ONLY_PORT)
+                }
+
+                networks {
+                    connect(networkId, listOf(networkAlias))
+                }
+            }
+
+            container.state shouldBeSameInstanceAs Container.State.NonExisting.Draft
+
+            container.create()
+
+            container.state shouldBeSameInstanceAs Container.State.Existing.Created
         }
     }
 
