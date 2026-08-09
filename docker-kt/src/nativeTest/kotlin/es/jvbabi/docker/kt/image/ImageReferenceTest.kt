@@ -30,6 +30,12 @@ class ImageReferenceTest : FunSpec({
         test("treats localhost as a registry even without a dot") {
             ImageApi.registryFromImage("localhost/app") shouldBe "localhost"
         }
+
+        test("keeps the port with the registry") {
+            ImageApi.registryFromImage("localhost:5000/app") shouldBe "localhost:5000"
+            ImageApi.registryFromImage("registry.example.com:5000/team/app:2.1") shouldBe
+                "registry.example.com:5000"
+        }
     }
 
     context("repositoryFromImage") {
@@ -46,6 +52,16 @@ class ImageReferenceTest : FunSpec({
             ImageApi.repositoryFromImage("ghcr.io/julius-babies/docker-kt:1.0") shouldBe
                 "ghcr.io/julius-babies/docker-kt"
         }
+
+        test("does not mistake a registry port for a tag") {
+            ImageApi.repositoryFromImage("localhost:5000/app") shouldBe "localhost:5000/app"
+            ImageApi.repositoryFromImage("localhost:5000/app:2.0") shouldBe "localhost:5000/app"
+        }
+
+        test("does not add library/ to a registry-qualified repository") {
+            // "library" is a Docker Hub convention, a private registry has no such namespace.
+            ImageApi.repositoryFromImage("registry.example.com/app") shouldBe "registry.example.com/app"
+        }
     }
 
     context("tagFromImage") {
@@ -57,6 +73,12 @@ class ImageReferenceTest : FunSpec({
         test("reads an explicit tag") {
             ImageApi.tagFromImage("alpine:3.19") shouldBe "3.19"
             ImageApi.tagFromImage("ghcr.io/julius-babies/docker-kt:1.2.3") shouldBe "1.2.3"
+        }
+
+        test("does not read a registry port as a tag") {
+            ImageApi.tagFromImage("localhost:5000/app") shouldBe "latest"
+            ImageApi.tagFromImage("localhost:5000/app:2.0") shouldBe "2.0"
+            ImageApi.tagFromImage("registry.example.com:5000/team/app") shouldBe "latest"
         }
     }
 })
