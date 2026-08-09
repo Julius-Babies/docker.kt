@@ -1,10 +1,17 @@
-package es.jvbabi.docker.kt
+package es.jvbabi.docker.kt.container
 
 import es.jvbabi.docker.kt.api.container.Container
 import es.jvbabi.docker.kt.api.container.ContainerState
-import es.jvbabi.docker.kt.api.container.api.DockerContainer
-import es.jvbabi.docker.kt.docker.DockerClient
+import es.jvbabi.docker.kt.support.RequiresDocker
+import es.jvbabi.docker.kt.support.containerByName
+import es.jvbabi.docker.kt.support.ensureImage
+import es.jvbabi.docker.kt.support.removeContainerQuietly
+import es.jvbabi.docker.kt.support.removeNetworkQuietly
+import es.jvbabi.docker.kt.support.removeVolumeQuietly
+import es.jvbabi.docker.kt.support.testResourceName
+import es.jvbabi.docker.kt.support.withDocker
 import es.jvbabi.kfile.File
+import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.maps.shouldContainAll
@@ -12,10 +19,7 @@ import io.kotest.matchers.maps.shouldContainKey
 import io.kotest.matchers.maps.shouldNotContainKey
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
-import io.kotest.core.spec.style.FunSpec
-import io.ktor.client.request.delete
 import kotlinx.coroutines.delay
-import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
 private const val IMAGE = "alpine:latest"
@@ -32,66 +36,53 @@ private const val EXPOSED_ONLY_PORT = 9000
  * of it back, and removes it again.
  *
  * Every resource is created for this run alone - container, named volume, network and a directory
- * below the system temp directory, each carrying a per-run id so concurrent runs cannot collide.
- * [afterSpec] tears all four down even when a test fails, so a run leaves the host as it found it.
+ * below the system temp directory, each carrying the shared run id. [afterSpec] tears all four down
+ * even when a test fails, so a run leaves the host as it found it.
  */
 class ContainerLifecycleTest : FunSpec({
 
-    val runId = Clock.System.now().toEpochMilliseconds()
-    val containerName = "docker-kt-test-$runId"
-    val volumeName = "docker-kt-test-volume-$runId"
-    val networkName = "docker-kt-test-network-$runId"
-    val networkAlias = "docker-kt-test-alias"
+    tags(RequiresDocker)
+
+    val containerName = testResourceName("lifecycle-container")
+    val volumeName = testResourceName("lifecycle-volume")
+    val networkName = testResourceName("lifecycle-network")
+    val networkAlias = "docker-kt-lifecycle-alias"
     val hostDir = File.getTempDirectory().resolve(containerName)
 
     val labels = mapOf(
         "io.github.julius-babies.docker-kt.test" to "true",
-        "io.github.julius-babies.docker-kt.run-id" to runId.toString()
+        "io.github.julius-babies.docker-kt.resource" to containerName
     )
 
     val environment = mapOf(
         "DOCKER_KT_TEST" to "true",
-        "DOCKER_KT_RUN_ID" to runId.toString()
+        "DOCKER_KT_RESOURCE" to containerName
     )
 
     var networkId = ""
-
-    suspend fun DockerClient.findTestContainer(): DockerContainer? =
-        containers.getContainers(all = true).find { container ->
-            container.names.any { it.trimStart('/') == containerName }
-        }
 
     beforeSpec {
         hostDir.mkdir(recursive = true)
         hostDir.resolve("marker.txt").writeText("docker.kt")
 
-        DockerClient().use { client ->
-            // Compare the tag exactly: a "contains" match is already satisfied by any other
-            // alpine-based image on the host, which would skip the pull and fail the create below.
-            if (client.images.getImages().none { IMAGE in it.repoTags }) {
-                client.images.pull(IMAGE, onDownload = { _, _ -> })
-            }
-
+        withDocker { client ->
+            client.ensureImage(IMAGE)
             client.networks.createNetwork(name = networkName, labels = labels)
             networkId = client.networks.getNetworks().first { it.name == networkName }.id
         }
     }
 
     afterSpec {
-        DockerClient().use { client ->
-            client.findTestContainer()?.let { container ->
-                runCatching { client.containers.killContainer(container.id) }
-                runCatching { client.containers.deleteContainer(container.id) }
-            }
-            if (networkId.isNotEmpty()) runCatching { client.networks.removeNetwork(networkId) }
-            // The library has no volume API yet, so the named volume goes back over the raw socket.
-            runCatching { client.socket.delete("/volumes/$volumeName") }
+        withDocker { client ->
+            client.removeContainerQuietly(containerName)
+            client.removeNetworkQuietly(networkId)
+            client.removeVolumeQuietly(volumeName)
         }
         if (hostDir.exists()) hostDir.delete(recursive = true)
     }
 
     test("creates a container with volumes, ports, labels, environment and a network") {
-        DockerClient().use { client ->
+        withDocker { client ->
             client.containers.createContainer(
                 image = IMAGE,
                 name = containerName,
@@ -117,15 +108,15 @@ class ContainerLifecycleTest : FunSpec({
                 cmd = listOf("sleep 3600")
             )
 
-            val container = client.findTestContainer()
+            val container = client.containerByName(containerName)
             container.shouldNotBeNull()
             container.state shouldBe ContainerState.CREATED
         }
     }
 
     test("inspect reports the labels, environment, command and ports it was created with") {
-        DockerClient().use { client ->
-            val containerId = client.findTestContainer().shouldNotBeNull().id
+        withDocker { client ->
+            val containerId = client.containerByName(containerName).shouldNotBeNull().id
             val inspect = client.containers.inspectContainer(containerId)
 
             inspect.config.labels shouldContainAll labels
@@ -149,8 +140,8 @@ class ContainerLifecycleTest : FunSpec({
     }
 
     test("the container list reports the host bind and the named volume") {
-        DockerClient().use { client ->
-            val container = client.findTestContainer().shouldNotBeNull()
+        withDocker { client ->
+            val container = client.containerByName(containerName).shouldNotBeNull()
 
             val hostMount = container.mounts.single { it.destination == "/mnt/host" }
             hostMount.type shouldBe "bind"
@@ -167,8 +158,8 @@ class ContainerLifecycleTest : FunSpec({
     }
 
     test("starts the container and publishes the port on the host") {
-        DockerClient().use { client ->
-            val containerId = client.findTestContainer().shouldNotBeNull().id
+        withDocker { client ->
+            val containerId = client.containerByName(containerName).shouldNotBeNull().id
             client.containers.startContainer(containerId)
 
             val inspect = client.containers.inspectContainer(containerId)
@@ -187,20 +178,20 @@ class ContainerLifecycleTest : FunSpec({
             val network = inspect.networkSettings.networks[networkName].shouldNotBeNull()
             network.networkId shouldBe networkId
 
-            client.findTestContainer().shouldNotBeNull().state shouldBe ContainerState.RUNNING
+            client.containerByName(containerName).shouldNotBeNull().state shouldBe ContainerState.RUNNING
         }
     }
 
     test("removes the container once it has been stopped") {
-        DockerClient().use { client ->
-            val containerId = client.findTestContainer().shouldNotBeNull().id
+        withDocker { client ->
+            val containerId = client.containerByName(containerName).shouldNotBeNull().id
 
             client.containers.stopContainer(containerId)
             delay(2.seconds)
-            client.findTestContainer().shouldNotBeNull().state shouldBe ContainerState.EXITED
+            client.containerByName(containerName).shouldNotBeNull().state shouldBe ContainerState.EXITED
 
             client.containers.deleteContainer(containerId)
-            client.findTestContainer() shouldBe null
+            client.containerByName(containerName) shouldBe null
         }
     }
 })

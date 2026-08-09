@@ -1,9 +1,10 @@
-package es.jvbabi.docker.kt
+package es.jvbabi.docker.kt.container
 
 import es.jvbabi.docker.kt.api.container.Container
 import es.jvbabi.docker.kt.api.container.ContainerState
 import es.jvbabi.docker.kt.api.image.ImageNotFoundException
 import es.jvbabi.docker.kt.docker.DockerClient
+import es.jvbabi.docker.kt.support.RequiresDocker
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldNotBeEmpty
@@ -15,6 +16,8 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
 class ContainerApiTest : FunSpec({
+    tags(RequiresDocker)
+
     val testImageName = "alpine:latest"
     val testContainerName = "test-container-${Clock.System.now().epochSeconds}"
 

@@ -1,8 +1,10 @@
-package es.jvbabi.docker.kt
+package es.jvbabi.docker.kt.image
 
 import es.jvbabi.docker.kt.api.image.ImagePullStatus
 import es.jvbabi.docker.kt.api.image.ImageRemoveStatus
 import es.jvbabi.docker.kt.docker.DockerClient
+import es.jvbabi.docker.kt.support.RequiresDocker
+import es.jvbabi.docker.kt.support.withDocker
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainAll
@@ -22,10 +24,13 @@ private const val IMAGE = "hello-world:latest"
  * Pulls an image, checks that it arrives with its layer callbacks and shows up in the image list,
  * then removes it again and checks that Docker reports the untag and the delete.
  *
- * The spec restores whatever it found: if the host already had [IMAGE], [afterSpec] pulls it back,
- * otherwise it makes sure the image is gone again.
+ * Unlike the other integration specs this one cannot work on a resource of its own - an image tag is
+ * global. It therefore restores what it found: if the host already had [IMAGE], [afterSpec] pulls it
+ * back, otherwise it makes sure the image is gone again.
  */
 class ImageLifecycleTest : FunSpec({
+
+    tags(RequiresDocker)
 
     val announcedLayers = mutableListOf<String>()
     val downloadStatuses = mutableListOf<Pair<String, ImagePullStatus>>()
@@ -36,7 +41,7 @@ class ImageLifecycleTest : FunSpec({
         images.getImages().any { IMAGE in it.repoTags }
 
     beforeSpec {
-        DockerClient().use { client ->
+        withDocker { client ->
             wasPresentBefore = client.hasTestImage()
             // Start from a known state: pulling an image that is already there only produces
             // "already exists" messages, and the layer callbacks would never fire.
@@ -45,7 +50,7 @@ class ImageLifecycleTest : FunSpec({
     }
 
     afterSpec {
-        DockerClient().use { client ->
+        withDocker { client ->
             val present = client.hasTestImage()
             if (wasPresentBefore && !present) {
                 runCatching { client.images.pull(IMAGE, onDownload = { _, _ -> }) }
@@ -56,7 +61,7 @@ class ImageLifecycleTest : FunSpec({
     }
 
     test("pull reports the layers it is about to fetch and their progress") {
-        DockerClient().use { client ->
+        withDocker { client ->
             client.hasTestImage() shouldBe false
 
             client.images.pull(
@@ -80,7 +85,7 @@ class ImageLifecycleTest : FunSpec({
     }
 
     test("the pulled image shows up in the image list") {
-        DockerClient().use { client ->
+        withDocker { client ->
             val image = client.images.getImages().find { IMAGE in it.repoTags }
 
             image.shouldNotBeNull()
@@ -91,7 +96,7 @@ class ImageLifecycleTest : FunSpec({
     }
 
     test("remove untags the image and deletes its layers") {
-        DockerClient().use { client ->
+        withDocker { client ->
             val imageId = client.images.getImages().first { IMAGE in it.repoTags }.id
 
             val statuses = client.images.removeImage(IMAGE)
