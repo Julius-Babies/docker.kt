@@ -4,243 +4,98 @@ import es.jvbabi.docker.kt.api.Container
 import es.jvbabi.docker.kt.api.image.ImageNotFoundException
 import es.jvbabi.docker.kt.docker.DockerClient
 import es.jvbabi.docker.kt.support.RequiresDocker
+import es.jvbabi.docker.kt.support.ensureImage
+import es.jvbabi.docker.kt.support.removeContainerQuietly
+import es.jvbabi.docker.kt.support.testResourceName
+import io.kotest.assertions.nondeterministic.eventually
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
-import io.kotest.matchers.collections.shouldNotBeEmpty
+import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
-import kotlinx.coroutines.delay
-import kotlin.time.Clock
+import io.kotest.matchers.types.shouldBeInstanceOf
 import kotlin.time.Duration.Companion.seconds
 
+private const val IMAGE = "alpine:latest"
+
+/**
+ * What is left of ContainerApi once containers do their own work: listing with and without the
+ * stopped ones, restarting, and the error a missing image produces.
+ *
+ * Creating, starting, stopping, pausing, attaching to networks and removing are covered by
+ * [ContainerLifecycleTest], [ContainerRunStateTest] and [ContainerNetworkAttachmentTest].
+ */
 class ContainerApiTest : FunSpec({
+
     tags(RequiresDocker)
 
-    val testImageName = "alpine:latest"
-    val testContainerName = "test-container-${Clock.System.now().epochSeconds}"
+    val containerName = testResourceName("api-container")
+
+    // The container is carried from test to test, so one client has to outlive the whole spec.
+    lateinit var client: DockerClient
+    lateinit var container: Container
 
     beforeSpec {
-        // Ensure test image is available
-        DockerClient().use { client ->
-            val images = client.images.getImages()
-            val hasAlpine = images.any { image ->
-                image.repoTags.any { it.contains("alpine") }
-            }
+        client = DockerClient()
+        client.ensureImage(IMAGE)
+    }
 
-            if (!hasAlpine) {
-                println("Pulling alpine image for tests...")
-                client.images.pull(testImageName, onDownload = { _, _ -> })
-            }
+    afterSpec {
+        client.removeContainerQuietly(containerName)
+        client.close()
+    }
+
+    test("creating from an image the host does not have reports the image, not a transport error") {
+        val missing = "docker-kt-no-such-image:latest"
+
+        val exception = shouldThrow<ImageNotFoundException> {
+            client.containerBuilder(missing) { name = "$containerName-never-created" }.create()
+        }
+
+        exception.image shouldBe missing
+        exception.message shouldContain "Image not found"
+    }
+
+    test("restart takes a running container down and brings it back up") {
+        container = client.containerBuilder(IMAGE) {
+            name = containerName
+            entrypoint = listOf("/bin/sh", "-c")
+            cmd = listOf("sleep 3600")
+        }.apply { create() }
+
+        container.start()
+        val firstStart = eventually(5.seconds) {
+            client.containers.inspectContainer(container.id).state
+                .also { it.running shouldBe true }
+                .startedAt
+        }
+
+        client.containers.restartContainer(container.id)
+
+        // Up again, but not the same run: the daemon reports a later start.
+        eventually(10.seconds) {
+            val state = client.containers.inspectContainer(container.id).state
+            state.running shouldBe true
+            state.startedAt shouldNotBe firstStart
         }
     }
 
-    test("Get containers - should list all containers") {
-        DockerClient().use { client ->
-            val containers = client.containers.getContainers(all = true)
-            println("Found ${containers.size} containers")
-            containers.forEach { container ->
-                println("  - ${container.name} (${container.state})")
-            }
-        }
+    test("the listing leaves stopped containers out unless asked for all of them") {
+        client.containers.getContainers(all = false).map { it.name } shouldContain containerName
+
+        container.stop()
+
+        client.containers.getContainers(all = false).map { it.name } shouldNotContain containerName
+        client.containers.getContainers(all = true).map { it.name } shouldContain containerName
     }
 
-    test("Create container - should create a new container") {
-        DockerClient().use { client ->
-            // Cleanup vorheriger Test-Container
-            cleanupTestContainer(client, testContainerName)
-
-            client.containerBuilder(testImageName) {
-                name = testContainerName
-
-                environment {
-                    put("TEST_VAR", "test_value")
-                    put("ANOTHER_VAR", "another_value")
-                }
-
-                labels {
-                    put("test", "true")
-                    put("created-by", "kotest")
-                }
-            }.create()
-
-            val containers = client.containers.getContainers(all = true)
-            val createdContainer = containers.find { it.name == testContainerName }
-
-            createdContainer shouldNotBe null
-            createdContainer!!.image shouldContain "alpine"
-            createdContainer.state shouldBe Container.State.Existing.Created
-            createdContainer.labels["test"] shouldBe "true"
-            createdContainer.labels["created-by"] shouldBe "kotest"
-
-            // Cleanup
-            cleanupTestContainer(client, testContainerName)
-        }
-    }
-
-    test("Create container with non-existent image - should throw ImageNotFoundException") {
-        DockerClient().use { client ->
-            val exception = shouldThrow<ImageNotFoundException> {
-                client.containerBuilder("non-existent-image-12345:latest") {
-                    name = "should-not-exist"
-                }.create()
-            }
-
-            exception.message shouldContain "Image not found"
-            exception.image shouldBe "non-existent-image-12345:latest"
-        }
-    }
-
-    test("Start and stop container lifecycle") {
-        DockerClient().use { client ->
-            cleanupTestContainer(client, testContainerName)
-
-            // Create container
-            client.containerBuilder(testImageName) { name = testContainerName }.create()
-
-            var container = findContainer(client, testContainerName)
-            container shouldNotBe null
-            container!!.state shouldBe Container.State.Existing.Created
-
-            // Start container
-            container.start()
-            container = findContainer(client, testContainerName)
-            container!!.state shouldBe Container.State.Existing.Running
-
-            // Stop container
-            container.stop()
-            delay(2.seconds)
-            var stoppedContainer = findContainer(client, testContainerName)
-            stoppedContainer!!.state shouldBe Container.State.Existing.Stopped
-
-            // Cleanup
-            cleanupTestContainer(client, testContainerName)
-        }
-    }
-
-    test("Restart container") {
-        DockerClient().use { client ->
-            cleanupTestContainer(client, testContainerName)
-
-            // Create and start container
-            client.containerBuilder(testImageName) { name = testContainerName }.create()
-            val container = findContainer(client, testContainerName)!!
-            container.start()
-
-            // Restart container
-            client.containers.restartContainer(container.id)
-            delay(2.seconds)
-
-            val restartedContainer = findContainer(client, testContainerName)!!
-            restartedContainer.state shouldBe Container.State.Existing.Running
-
-            // Cleanup
-            cleanupTestContainer(client, testContainerName)
-        }
-    }
-
-    test("Pause and kill container") {
-        DockerClient().use { client ->
-            cleanupTestContainer(client, testContainerName)
-
-            // Create and start container
-            client.containerBuilder(testImageName) { name = testContainerName }.create()
-            val container = findContainer(client, testContainerName)!!
-            container.start()
-
-            // Pause container
-            container.pause()
-            val pausedContainer = findContainer(client, testContainerName)!!
-            pausedContainer.state shouldBe Container.State.Existing.Paused
-
-            // Kill container (auch pausierte Container können gekillt werden)
-            container.kill()
-            delay(500)
-
-            val killedContainer = findContainer(client, testContainerName)!!
-            killedContainer.state shouldBe Container.State.Existing.Stopped
-
-            // Cleanup
-            cleanupTestContainer(client, testContainerName)
-        }
-    }
-
-    test("Delete container") {
-        DockerClient().use { client ->
-            cleanupTestContainer(client, testContainerName)
-
-            // Create container
-            client.containerBuilder(testImageName) { name = testContainerName }.create()
-
-            var container = findContainer(client, testContainerName)
-            container shouldNotBe null
-
-            // Delete container
-            client.containers.deleteContainer(container!!.id)
-
-            // Verify deletion
-            container = findContainer(client, testContainerName)
-            container shouldBe null
-        }
-    }
-
-    test("Create container with volume binds") {
-        DockerClient().use { client ->
-            val volumeTestName = "volume-test-${Clock.System.now().epochSeconds}"
-            cleanupTestContainer(client, volumeTestName)
-
-            // Create with volume bind
-            client.containerBuilder(testImageName) {
-                name = volumeTestName
-
-                volumes {
-                    bindVolume("my-test-volume", "/data")
-                    bindHost("/tmp", "/host-tmp")
-                }
-            }.create()
-
-            val container = findContainer(client, volumeTestName)
-            container shouldNotBe null
-            container!!.volumes.shouldNotBeEmpty()
-
-            // Cleanup
-            cleanupTestContainer(client, volumeTestName)
-        }
-    }
-
-    test("Get containers - filter running only") {
-        DockerClient().use { client ->
-            val allContainers = client.containers.getContainers(all = true)
-            val runningContainers = client.containers.getContainers(all = false)
-
-            println("All containers: ${allContainers.size}")
-            println("Running containers: ${runningContainers.size}")
-
-            runningContainers.forEach { container ->
-                container.state shouldBe Container.State.Existing.Running
-            }
+    test("everything the listing hands out is a container that exists") {
+        client.containers.getContainers(all = true).forEach { listed ->
+            listed.id shouldNotBe ""
+            // Whatever status the daemon reported, it mapped onto a state that means "it is there".
+            listed.state.shouldBeInstanceOf<Container.State.Existing>()
         }
     }
 })
-
-private suspend fun findContainer(client: DockerClient, name: String) =
-    client.containers.getContainers(all = true).find { it.name == name }
-
-private suspend fun cleanupTestContainer(client: DockerClient, name: String) {
-    val container = findContainer(client, name)
-    if (container != null) {
-        try {
-            // Try to stop if running
-            if (container.state is Container.State.Existing.Running ||
-                container.state is Container.State.Existing.Paused
-            ) {
-                container.kill()
-                delay(2.seconds)
-            }
-            client.containers.deleteContainer(container.id)
-        } catch (e: Exception) {
-            println("Cleanup failed for $name: ${e.message}")
-        }
-    }
-}
-
