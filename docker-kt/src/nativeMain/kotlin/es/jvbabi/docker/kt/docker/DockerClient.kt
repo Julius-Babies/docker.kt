@@ -12,7 +12,6 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
-import kotlinx.serialization.json.Json
 
 expect fun getHttpClient(): HttpClient
 
@@ -20,12 +19,7 @@ class DockerClient: AutoCloseable {
     internal val socket = getHttpClient()
     internal val httpClient = HttpClient {
         install(ContentNegotiation) {
-            json(Json {
-                ignoreUnknownKeys = true
-                isLenient = true
-                prettyPrint = true
-                encodeDefaults = false
-            })
+            json(dockerJson)
         }
     }
 

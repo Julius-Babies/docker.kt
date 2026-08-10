@@ -34,10 +34,10 @@ jobs:
       - name: Check the Docker daemon is up
         run: docker version
 
-      # allTests runs whatever the host can run: on this runner that is linuxX64Test, and the other
-      # native targets are skipped rather than failing.
+      # Named rather than allTests: that aggregate builds a test binary for every target, so this
+      # Linux runner would link the Windows and macOS ones too, only to skip running them.
       - name: Run tests
-        run: ./gradlew :docker-kt:allTests
+        run: ./gradlew :docker-kt:linuxX64Test
 
       - name: Upload test reports
         if: failure()

@@ -6,7 +6,6 @@ import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.serialization.kotlinx.json.json
-import kotlinx.serialization.json.Json
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.seconds
 
@@ -18,11 +17,7 @@ actual fun getHttpClient() = HttpClient(CIO) {
     }
 
     install(ContentNegotiation) {
-        json(Json {
-            ignoreUnknownKeys = true
-            isLenient = true
-            prettyPrint = true
-        })
+        json(dockerJson)
     }
 
     install(HttpTimeout) {
