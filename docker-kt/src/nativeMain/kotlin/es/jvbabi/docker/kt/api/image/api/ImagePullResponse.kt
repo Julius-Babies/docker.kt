@@ -23,9 +23,10 @@ internal sealed class DockerImagePullApiStatus {
         @SerialName("progressDetail") val progressDetail: ProgressDetail
     ): DockerImagePullApiStatus() {
         @Serializable
+        // Docker reports whatever it knows at that moment: early messages carry neither figure.
         data class ProgressDetail(
-            @SerialName("current") val current: Long,
-            @SerialName("total") val total: Long
+            @SerialName("current") val current: Long = 0,
+            @SerialName("total") val total: Long = 0
         )
     }
 
@@ -36,9 +37,11 @@ internal sealed class DockerImagePullApiStatus {
         @SerialName("progressDetail") val progressDetail: ProgressDetail
     ): DockerImagePullApiStatus() {
         @Serializable
+        // "units" only shows up once Docker has a unit to name, "current" not at all on some
+        // daemons - a pull of a cached layer sends progressDetail as an empty object.
         data class ProgressDetail(
-            @SerialName("current") val current: Long,
-            @SerialName("units") val unit: String
+            @SerialName("current") val current: Long = 0,
+            @SerialName("units") val unit: String = ""
         )
     }
 

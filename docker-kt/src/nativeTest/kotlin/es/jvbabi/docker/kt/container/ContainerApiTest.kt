@@ -87,7 +87,11 @@ class ContainerApiTest : FunSpec({
 
         container.stop()
 
-        client.containers.getContainers(all = false).map { it.name } shouldNotContain containerName
+        // The stop request returns once the process is gone, but the listing can still carry it as
+        // running for a moment afterwards.
+        eventually(10.seconds) {
+            client.containers.getContainers(all = false).map { it.name } shouldNotContain containerName
+        }
         client.containers.getContainers(all = true).map { it.name } shouldContain containerName
     }
 
