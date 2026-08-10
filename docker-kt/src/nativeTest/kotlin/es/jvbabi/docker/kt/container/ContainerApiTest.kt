@@ -1,7 +1,6 @@
 package es.jvbabi.docker.kt.container
 
 import es.jvbabi.docker.kt.api.Container
-import es.jvbabi.docker.kt.api.container.ContainerState
 import es.jvbabi.docker.kt.api.image.ImageNotFoundException
 import es.jvbabi.docker.kt.docker.DockerClient
 import es.jvbabi.docker.kt.support.RequiresDocker
@@ -41,7 +40,7 @@ class ContainerApiTest : FunSpec({
             val containers = client.containers.getContainers(all = true)
             println("Found ${containers.size} containers")
             containers.forEach { container ->
-                println("  - ${container.names.firstOrNull()} (${container.state})")
+                println("  - ${container.name} (${container.state})")
             }
         }
     }
@@ -66,13 +65,11 @@ class ContainerApiTest : FunSpec({
             }.create()
 
             val containers = client.containers.getContainers(all = true)
-            val createdContainer = containers.find {
-                it.names.any { name -> name.contains(testContainerName) }
-            }
+            val createdContainer = containers.find { it.name == testContainerName }
 
             createdContainer shouldNotBe null
             createdContainer!!.image shouldContain "alpine"
-            createdContainer.state shouldBe "created"
+            createdContainer.state shouldBe Container.State.Existing.Created
             createdContainer.labels["test"] shouldBe "true"
             createdContainer.labels["created-by"] shouldBe "kotest"
 
@@ -103,18 +100,18 @@ class ContainerApiTest : FunSpec({
 
             var container = findContainer(client, testContainerName)
             container shouldNotBe null
-            container!!.state shouldBe "created"
+            container!!.state shouldBe Container.State.Existing.Created
 
             // Start container
             client.containers.startContainer(container.id)
             container = findContainer(client, testContainerName)
-            container!!.state shouldBe ContainerState.RUNNING
+            container!!.state shouldBe Container.State.Existing.Running
 
             // Stop container
             client.containers.stopContainer(container.id)
             delay(2.seconds)
             var stoppedContainer = findContainer(client, testContainerName)
-            stoppedContainer!!.state shouldBe ContainerState.EXITED
+            stoppedContainer!!.state shouldBe Container.State.Existing.Stopped
 
             // Cleanup
             cleanupTestContainer(client, testContainerName)
@@ -135,7 +132,7 @@ class ContainerApiTest : FunSpec({
             delay(2.seconds)
 
             val restartedContainer = findContainer(client, testContainerName)!!
-            restartedContainer.state shouldBe ContainerState.RUNNING
+            restartedContainer.state shouldBe Container.State.Existing.Running
 
             // Cleanup
             cleanupTestContainer(client, testContainerName)
@@ -154,14 +151,14 @@ class ContainerApiTest : FunSpec({
             // Pause container
             client.containers.pauseContainer(container.id)
             val pausedContainer = findContainer(client, testContainerName)!!
-            pausedContainer.state shouldBe "paused"
+            pausedContainer.state shouldBe Container.State.Existing.Paused
 
             // Kill container (auch pausierte Container können gekillt werden)
             client.containers.killContainer(container.id)
             delay(500)
 
             val killedContainer = findContainer(client, testContainerName)!!
-            killedContainer.state shouldBe "exited"
+            killedContainer.state shouldBe Container.State.Existing.Stopped
 
             // Cleanup
             cleanupTestContainer(client, testContainerName)
@@ -204,7 +201,7 @@ class ContainerApiTest : FunSpec({
 
             val container = findContainer(client, volumeTestName)
             container shouldNotBe null
-            container!!.mounts.shouldNotBeEmpty()
+            container!!.volumes.shouldNotBeEmpty()
 
             // Cleanup
             cleanupTestContainer(client, volumeTestName)
@@ -220,23 +217,23 @@ class ContainerApiTest : FunSpec({
             println("Running containers: ${runningContainers.size}")
 
             runningContainers.forEach { container ->
-                container.state shouldBe ContainerState.RUNNING
+                container.state shouldBe Container.State.Existing.Running
             }
         }
     }
 })
 
 private suspend fun findContainer(client: DockerClient, name: String) =
-    client.containers.getContainers(all = true).find {
-        it.names.any { containerName -> containerName.contains(name) }
-    }
+    client.containers.getContainers(all = true).find { it.name == name }
 
 private suspend fun cleanupTestContainer(client: DockerClient, name: String) {
     val container = findContainer(client, name)
     if (container != null) {
         try {
             // Try to stop if running
-            if (container.state == ContainerState.RUNNING || container.state == ContainerState.PAUSED) {
+            if (container.state is Container.State.Existing.Running ||
+                container.state is Container.State.Existing.Paused
+            ) {
                 client.containers.killContainer(container.id)
                 delay(2.seconds)
             }

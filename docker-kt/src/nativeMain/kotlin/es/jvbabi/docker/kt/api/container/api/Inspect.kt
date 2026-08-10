@@ -95,10 +95,10 @@ data class PortBinding(
 
 @Serializable
 data class InspectNetworkSettings(
-    @SerialName("Networks") val networks: Map<String, InspectNetwork>,
-    @SerialName("SandboxID") val sandboxId: String,
-    @SerialName("SandboxKey") val sandboxKey: String,
-    @SerialName("Ports") val ports: Map<String, List<PortBinding>?>
+    @SerialName("Networks") val networks: Map<String, InspectNetwork> = emptyMap(),
+    @SerialName("SandboxID") val sandboxId: String = "",
+    @SerialName("SandboxKey") val sandboxKey: String = "",
+    @SerialName("Ports") val ports: Map<String, List<PortBinding>?> = emptyMap()
 ) {
     @Serializable
     data class PortBinding(
@@ -107,25 +107,27 @@ data class InspectNetworkSettings(
     )
 }
 
+// Docker reports only what applies to a given endpoint - an address that was never assigned
+// statically, or an IPv6 setting on a v4-only network, is left out rather than sent as empty.
 @Serializable
 data class InspectNetwork(
-    @SerialName("IPAMConfig") val ipamConfig: InspectIPAMConfig?,
-    @SerialName("Links") val links: List<String>?,
-    @SerialName("Aliases") val aliases: List<String>?,
-    @SerialName("NetworkID") val networkId: String,
-    @SerialName("EndpointID") val endpointId: String,
-    @SerialName("Gateway") val gateway: String,
-    @SerialName("IPAddress") val ipAddress: String,
-    @SerialName("IPPrefixLen") val ipPrefixLen: Int,
-    @SerialName("IPv6Gateway") val ipv6Gateway: String,
-    @SerialName("GlobalIPv6Address") val globalIPv6Address: String,
-    @SerialName("GlobalIPv6PrefixLen") val globalIPv6PrefixLen: Int,
-    @SerialName("MacAddress") val macAddress: String,
+    @SerialName("IPAMConfig") val ipamConfig: InspectIPAMConfig? = null,
+    @SerialName("Links") val links: List<String>? = null,
+    @SerialName("Aliases") val aliases: List<String>? = null,
+    @SerialName("NetworkID") val networkId: String = "",
+    @SerialName("EndpointID") val endpointId: String = "",
+    @SerialName("Gateway") val gateway: String = "",
+    @SerialName("IPAddress") val ipAddress: String = "",
+    @SerialName("IPPrefixLen") val ipPrefixLen: Int = 0,
+    @SerialName("IPv6Gateway") val ipv6Gateway: String = "",
+    @SerialName("GlobalIPv6Address") val globalIPv6Address: String = "",
+    @SerialName("GlobalIPv6PrefixLen") val globalIPv6PrefixLen: Int = 0,
+    @SerialName("MacAddress") val macAddress: String = "",
 ) {
     @Serializable
     data class InspectIPAMConfig(
-        @SerialName("IPv4Address") val ipv4Address: String,
-        @SerialName("IPv6Address") val ipv6Address: String,
-        @SerialName("LinkLocalIPs") val linkLocalIPs: List<String>
+        @SerialName("IPv4Address") val ipv4Address: String? = null,
+        @SerialName("IPv6Address") val ipv6Address: String? = null,
+        @SerialName("LinkLocalIPs") val linkLocalIPs: List<String> = emptyList()
     )
 }

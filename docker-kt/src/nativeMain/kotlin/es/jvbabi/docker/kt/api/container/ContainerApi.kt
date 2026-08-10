@@ -15,13 +15,28 @@ import kotlin.time.Duration.Companion.seconds
 
 class ContainerApi internal constructor(private val client: DockerClient) {
     /**
-     * Lists all containers on the Docker host.
+     * Lists the containers on the Docker host, each one ready to work with: id filled in and state
+     * read from the daemon, so [Container.remove] works on them right away.
+     *
+     * The listing itself is only a summary - it carries no environment, entrypoint or healthcheck -
+     * so every container is inspected on top of it rather than handed back half filled in. That is
+     * one request per container; [getById] is the cheaper way in when the id is already known.
      *
      * @param all If true, returns all containers (including stopped ones).
      *            If false, it returns only running containers. Default is false.
-     * @return A list of [DockerContainer] objects representing the containers.
      */
-    suspend fun getContainers(all: Boolean = false): List<DockerContainer> = getContainers(client, all)
+    suspend fun getContainers(all: Boolean = false): List<Container> {
+        val listed = getContainers(client, all)
+        if (listed.isEmpty()) return emptyList()
+
+        // Shared across the whole batch instead of being looked up per container.
+        val knownNetworks = internalGetNetworksRequest(client)
+
+        return listed.mapNotNull { summary ->
+            // A container can be gone between the listing and the inspect.
+            inspectContainerOrNull(client, summary.id)?.toContainer(knownNetworks)
+        }
+    }
 
     /**
      * Looks up an existing container and hands it back as a [Container] that can be worked with -
@@ -32,6 +47,11 @@ class ContainerApi internal constructor(private val client: DockerClient) {
      */
     suspend fun getById(id: String): Container? {
         val inspect = inspectContainerOrNull(client, id) ?: return null
+        return inspect.toContainer(networksFor(inspect))
+    }
+
+    private fun Inspect.toContainer(knownNetworks: List<Network>): Container {
+        val inspect = this
 
         return Container(
             client = client,
@@ -83,37 +103,39 @@ class ContainerApi internal constructor(private val client: DockerClient) {
                 .map { it.toPortAndProtocol() }
                 .groupBy({ (port, _) -> port }, { (_, protocol) -> protocol })
                 .mapValues { (_, protocols) -> protocols.toSet() },
-            networks = resolveNetworks(inspect)
+            networks = resolveNetworks(inspect, knownNetworks)
         ).apply {
             this.id = inspect.id
             state = inspect.state.status.toContainerState()
         }
     }
 
+    /** The networks needed to resolve this one container's endpoints, or none if it has none. */
+    private suspend fun networksFor(inspect: Inspect): List<Network> =
+        if (inspect.networkSettings.networks.isEmpty()) emptyList()
+        else internalGetNetworksRequest(client)
+
     /**
      * Turns the endpoints inspect reports into the [Network] objects a [Container] holds on to.
      *
-     * Endpoints only carry an id, so the networks are looked up once for the whole container. Which
-     * key identifies them depends on how far the container got: once it has run, inspect keys the
-     * endpoints by network name and fills in NetworkID - before that the key is whatever the create
-     * request used, and NetworkID is still empty.
+     * Endpoints only carry an id, so they are matched against [knownNetworks] rather than looked up
+     * one by one. Which key identifies them depends on how far the container got: once it has run,
+     * inspect keys the endpoints by network name and fills in NetworkID - before that the key is
+     * whatever the create request used, and NetworkID is still empty.
      */
-    private suspend fun resolveNetworks(inspect: Inspect): List<Container.NetworkConfig> {
-        val endpoints = inspect.networkSettings.networks
-        if (endpoints.isEmpty()) return emptyList()
-
-        val known = internalGetNetworksRequest(client)
-
-        return endpoints.mapNotNull { (key, endpoint) ->
-            val network = known.find { it.id == endpoint.networkId }
-                ?: known.find { it.id == key || it.name == key }
+    private fun resolveNetworks(
+        inspect: Inspect,
+        knownNetworks: List<Network>
+    ): List<Container.NetworkConfig> =
+        inspect.networkSettings.networks.mapNotNull { (key, endpoint) ->
+            val network = knownNetworks.find { it.id == endpoint.networkId }
+                ?: knownNetworks.find { it.id == key || it.name == key }
                 // A network the daemon no longer lists cannot be handed out as an object. It cannot
                 // normally happen either: Docker refuses to remove a network still in use.
                 ?: return@mapNotNull null
 
             Container.NetworkConfig(network = network, aliases = endpoint.aliases.orEmpty())
         }
-    }
 
     /** Parses Docker's `"80/tcp"` port notation. */
     private fun String.toPortAndProtocol(): Pair<Int, Container.PortBinding.Protocol> =
@@ -200,13 +222,6 @@ data class CommandStreamResult(
 )
 
 object Container {
-    data class Healthcheck(
-        val test: List<String>,
-        val interval: Duration = 30.seconds,
-        val timeout: Duration = 30.seconds,
-        val startPeriod: Duration = 0.seconds,
-        val retries: Int = 3
-    )
 
     data class PortBinding(
         val hostPort: Int,

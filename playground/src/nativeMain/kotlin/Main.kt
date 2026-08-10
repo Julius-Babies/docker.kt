@@ -18,7 +18,7 @@ fun main() {
 
             val postgres = dockerClient.containers.getContainers(all = true)
                 .onEach { println(it) }
-                .firstOrNull { it.names.contains("/werkbank-postgres-18") }
+                .firstOrNull { it.name == "werkbank-postgres-18" }
             dockerClient.containers.inspectContainer(postgres!!.id).let {
                 println(it.networkSettings.networks.map { it.value.aliases })
             }
@@ -35,7 +35,7 @@ fun main() {
             dockerClient.images.pull("postgres:18.1-alpine3.22", onDownload = { _, _ -> })
             println("Creating test container...")
             var containerId = dockerClient.containers.getContainers(all = true)
-                .firstOrNull { it.names.contains("/testcontainer") }?.id
+                .firstOrNull { it.name == "testcontainer" }?.id
             if (containerId == null) dockerClient.containerBuilder("postgres:18.1-alpine3.22") {
                 name = "testcontainer"
 
@@ -47,7 +47,7 @@ fun main() {
                     put("POSTGRES_PASSWORD", "testpw")
                 }
             }.create()
-            containerId = dockerClient.containers.getContainers(all = true).firstOrNull { it.names.contains("/testcontainer") }?.id
+            containerId = dockerClient.containers.getContainers(all = true).firstOrNull { it.name == "testcontainer" }?.id
             requireNotNull(containerId)
             coroutineScope {
                 launch { dockerClient.containers.startContainer(containerId) }
@@ -67,7 +67,7 @@ fun main() {
             r2.stdout.collect { println(it) }
 
             containers.forEach { container ->
-                println("  - ${container.names.firstOrNull()} | ${container.state} | ${container.image}")
+                println("  - ${container.name} | ${container.state} | ${container.image}")
             }
         }
     }

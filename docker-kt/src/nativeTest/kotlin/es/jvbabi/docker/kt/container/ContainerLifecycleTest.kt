@@ -1,7 +1,6 @@
 package es.jvbabi.docker.kt.container
 
 import es.jvbabi.docker.kt.api.Container
-import es.jvbabi.docker.kt.api.container.ContainerState
 import es.jvbabi.docker.kt.support.*
 import es.jvbabi.kfile.File
 import io.kotest.assertions.nondeterministic.eventually
@@ -153,15 +152,17 @@ class ContainerLifecycleTest : FunSpec({
         withDocker { client ->
             val container = client.containerByName(containerName).shouldNotBeNull()
 
-            val hostMount = container.mounts.single { it.destination == "/mnt/host" }
-            hostMount.type shouldBe "bind"
-            hostMount.source shouldBe hostDir.absolutePath
-            hostMount.rw shouldBe false
+            val hostBind = container.volumes
+                .filterIsInstance<Container.VolumeBind.Host>()
+                .single { it.containerPath == "/mnt/host" }
+            hostBind.path shouldBe hostDir.absolutePath
+            hostBind.readOnly shouldBe true
 
-            val volumeMount = container.mounts.single { it.destination == "/mnt/volume" }
-            volumeMount.type shouldBe "volume"
-            volumeMount.name shouldBe volumeName
-            volumeMount.rw shouldBe true
+            val volumeBind = container.volumes
+                .filterIsInstance<Container.VolumeBind.Volume>()
+                .single { it.containerPath == "/mnt/volume" }
+            volumeBind.name shouldBe volumeName
+            volumeBind.readOnly shouldBe false
 
             container.labels shouldContainAll labels
         }
@@ -194,7 +195,8 @@ class ContainerLifecycleTest : FunSpec({
             val network = inspect.networkSettings.networks[networkName].shouldNotBeNull()
             network.networkId shouldBe networkId
 
-            client.containerByName(containerName).shouldNotBeNull().state shouldBe ContainerState.RUNNING
+            client.containerByName(containerName).shouldNotBeNull()
+                .state shouldBeSameInstanceAs Container.State.Existing.Running
         }
     }
 
@@ -242,7 +244,8 @@ class ContainerLifecycleTest : FunSpec({
 
             client.containers.stopContainer(containerId)
             delay(2.seconds)
-            client.containerByName(containerName).shouldNotBeNull().state shouldBe ContainerState.EXITED
+            client.containerByName(containerName).shouldNotBeNull()
+                .state shouldBeSameInstanceAs Container.State.Existing.Stopped
 
             container.remove()
 
