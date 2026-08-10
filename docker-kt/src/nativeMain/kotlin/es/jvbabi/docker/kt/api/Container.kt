@@ -2,6 +2,11 @@ package es.jvbabi.docker.kt.api
 
 import es.jvbabi.docker.kt.api.container.functions.createContainerInternal
 import es.jvbabi.docker.kt.api.container.functions.deleteContainer
+import es.jvbabi.docker.kt.api.container.functions.killContainer
+import es.jvbabi.docker.kt.api.container.functions.pauseContainer
+import es.jvbabi.docker.kt.api.container.functions.startContainerInternal
+import es.jvbabi.docker.kt.api.container.functions.stopContainer
+import es.jvbabi.docker.kt.api.container.functions.unpauseContainer
 import es.jvbabi.docker.kt.api.network.functions.internalConnectNetworkRequest
 import es.jvbabi.docker.kt.api.network.functions.internalDisconnectNetworkRequest
 import es.jvbabi.docker.kt.docker.DockerClient
@@ -155,6 +160,77 @@ class Container internal constructor(
         exposedPorts = fresh.exposedPorts
         networks = fresh.networks
         state = fresh.state
+    }
+
+    /**
+     * Starts this container.
+     *
+     * @param exceptionOnAlreadyRunning throws [es.jvbabi.docker.kt.api.container.ContainerAlreadyRunningException]
+     * instead of quietly doing nothing when it is already up
+     */
+    suspend fun start(exceptionOnAlreadyRunning: Boolean = false) {
+        refresh()
+        check(state is State.Existing) {
+            "Only an existing container can be started, but this container is $state"
+        }
+
+        startContainerInternal(client, id, exceptionOnAlreadyRunning)
+
+        state = State.Existing.Running
+    }
+
+    /**
+     * Stops this container, giving whatever runs inside a chance to shut down.
+     *
+     * Use [kill] to take it down straight away.
+     */
+    suspend fun stop() {
+        refresh()
+        checkRunningOrPaused("stopped")
+
+        stopContainer(client, id)
+
+        state = State.Existing.Stopped
+    }
+
+    /** Freezes every process in this container. Undo with [resume]. */
+    suspend fun pause() {
+        refresh()
+        check(state is State.Existing.Running) {
+            "Only a running container can be paused, but this container is $state"
+        }
+
+        pauseContainer(client, id)
+
+        state = State.Existing.Paused
+    }
+
+    /** Thaws a container that [pause] froze. */
+    suspend fun resume() {
+        refresh()
+        check(state is State.Existing.Paused) {
+            "Only a paused container can be resumed, but this container is $state"
+        }
+
+        unpauseContainer(client, id)
+
+        state = State.Existing.Running
+    }
+
+    /** Takes this container down without letting it shut down first. */
+    suspend fun kill() {
+        refresh()
+        checkRunningOrPaused("killed")
+
+        killContainer(client, id)
+
+        state = State.Existing.Stopped
+    }
+
+    private fun checkRunningOrPaused(action: String) {
+        check(state is State.Existing.Running || state is State.Existing.Paused) {
+            "Only a running or paused container can be $action, but this container is $state"
+        }
     }
 
     /**

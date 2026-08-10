@@ -1,11 +1,18 @@
-package es.jvbabi.docker.kt.api.container.api
+/*
+ * Wire types: how the Docker daemon represents things on the socket, one to one.
+ *
+ * Everything in this package is internal on purpose - it exists so the request functions have
+ * something to deserialise into, and it changes whenever Docker's API does. The library hands out
+ * its own types instead, which the api package builds from these.
+ */
+package es.jvbabi.docker.kt.dto
 
 import es.jvbabi.docker.kt.api.container.ContainerState
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class DockerContainer(
+internal data class DockerContainer(
     @SerialName("Id")
     val id: String,
 
@@ -53,7 +60,7 @@ data class DockerContainer(
 }
 
 @Serializable
-data class Port(
+internal data class Port(
     @SerialName("IP")
     val ip: String? = null,
 
@@ -68,7 +75,7 @@ data class Port(
 )
 
 @Serializable
-data class Mount(
+internal data class Mount(
     @SerialName("Type")
     val type: String,
 
@@ -95,13 +102,13 @@ data class Mount(
 )
 
 @Serializable
-data class NetworkSettings(
+internal data class NetworkSettings(
     @SerialName("Networks")
     val networks: Map<String, Network> = emptyMap()
 )
 
 @Serializable
-data class Network(
+internal data class Network(
     @SerialName("NetworkID")
     val networkId: String,
 

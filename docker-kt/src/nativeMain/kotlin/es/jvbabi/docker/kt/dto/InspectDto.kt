@@ -1,10 +1,17 @@
-package es.jvbabi.docker.kt.api.container.api
+/*
+ * Wire types: how the Docker daemon represents things on the socket, one to one.
+ *
+ * Everything in this package is internal on purpose - it exists so the request functions have
+ * something to deserialise into, and it changes whenever Docker's API does. The library hands out
+ * its own types instead, which the api package builds from these.
+ */
+package es.jvbabi.docker.kt.dto
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class Inspect(
+internal data class Inspect(
     @SerialName("Id") val id: String,
     @SerialName("Names") val names: List<String>? = null,
     /** Inspect reports a single name, with a leading slash, rather than the list [names] carries. */
@@ -18,7 +25,7 @@ data class Inspect(
 )
 
 @Serializable
-data class ContainerState(
+internal data class ContainerState(
     @SerialName("Status") val status: String,
     @SerialName("Running") val running: Boolean,
     @SerialName("Paused") val paused: Boolean,
@@ -33,14 +40,14 @@ data class ContainerState(
 )
 
 @Serializable
-data class Health(
+internal data class Health(
     @SerialName("Status") val status: String,
     @SerialName("FailingStreak") val failingStreak: Int,
     @SerialName("Log") val log: List<HealthLog>
 )
 
 @Serializable
-data class HealthLog(
+internal data class HealthLog(
     @SerialName("Start") val start: String,
     @SerialName("End") val end: String,
     @SerialName("ExitCode") val exitCode: Int,
@@ -48,7 +55,7 @@ data class HealthLog(
 )
 
 @Serializable
-data class ContainerConfig(
+internal data class ContainerConfig(
     @SerialName("Hostname") val hostname: String,
     @SerialName("Domainname") val domainname: String,
     @SerialName("User") val user: String,
@@ -73,7 +80,7 @@ data class ContainerConfig(
 
 /** Durations are reported in nanoseconds. */
 @Serializable
-data class InspectHealthcheck(
+internal data class InspectHealthcheck(
     @SerialName("Test") val test: List<String> = emptyList(),
     @SerialName("Interval") val interval: Long = 0,
     @SerialName("Timeout") val timeout: Long = 0,
@@ -82,19 +89,19 @@ data class InspectHealthcheck(
 )
 
 @Serializable
-data class HostConfig(
+internal data class HostConfig(
     @SerialName("NetworkMode") val networkMode: String,
     @SerialName("PortBindings") val portBindings: Map<String, List<PortBinding>> = emptyMap()
 )
 
 @Serializable
-data class PortBinding(
+internal data class PortBinding(
     @SerialName("HostIp") val hostIp: String,
     @SerialName("HostPort") val hostPort: String
 )
 
 @Serializable
-data class InspectNetworkSettings(
+internal data class InspectNetworkSettings(
     @SerialName("Networks") val networks: Map<String, InspectNetwork> = emptyMap(),
     @SerialName("SandboxID") val sandboxId: String = "",
     @SerialName("SandboxKey") val sandboxKey: String = "",
@@ -110,7 +117,7 @@ data class InspectNetworkSettings(
 // Docker reports only what applies to a given endpoint - an address that was never assigned
 // statically, or an IPv6 setting on a v4-only network, is left out rather than sent as empty.
 @Serializable
-data class InspectNetwork(
+internal data class InspectNetwork(
     @SerialName("IPAMConfig") val ipamConfig: InspectIPAMConfig? = null,
     @SerialName("Links") val links: List<String>? = null,
     @SerialName("Aliases") val aliases: List<String>? = null,

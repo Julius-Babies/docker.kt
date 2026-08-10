@@ -52,8 +52,8 @@ suspend fun DockerClient.ensureImage(image: String) {
 
 suspend fun DockerClient.removeContainerQuietly(name: String) {
     val container = runCatching { containerByName(name) }.getOrNull() ?: return
-    runCatching { containers.killContainer(container.id) }
-    runCatching { containers.deleteContainer(container.id) }
+    runCatching { container.kill() }
+    runCatching { container.remove() }
 }
 
 suspend fun DockerClient.removeNetworkQuietly(id: String) {

@@ -2,6 +2,7 @@ package es.jvbabi.docker.kt.api.network.functions
 
 import es.jvbabi.docker.kt.api.Network
 import es.jvbabi.docker.kt.docker.DockerClient
+import es.jvbabi.docker.kt.dto.CreateNetworkResponse
 import es.jvbabi.docker.kt.util.Optional
 import io.ktor.client.call.body
 import io.ktor.client.request.*
@@ -36,12 +37,6 @@ internal data class CreateNetworkRequest(
         )
     }
 }
-
-@Serializable
-internal data class CreateNetworkResponse(
-    @SerialName("Id") val id: String,
-    @SerialName("Warning") val warning: String? = null
-)
 
 /**
  * @return the id the daemon assigned to the new network

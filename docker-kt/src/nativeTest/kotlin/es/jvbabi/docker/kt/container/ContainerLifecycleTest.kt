@@ -170,8 +170,9 @@ class ContainerLifecycleTest : FunSpec({
 
     test("starts the container and publishes the port on the host") {
         withDocker { client ->
-            val containerId = client.containerByName(containerName).shouldNotBeNull().id
-            client.containers.startContainer(containerId)
+            val container = client.containerByName(containerName).shouldNotBeNull()
+            val containerId = container.id
+            container.start()
 
             // The start request can return before the daemon reports the new state, so poll rather
             // than wait a fixed amount: fast when it is fast, and still honest about a container
@@ -242,7 +243,7 @@ class ContainerLifecycleTest : FunSpec({
             val containerId = client.containerByName(containerName).shouldNotBeNull().id
             val container = client.containers.getById(containerId).shouldNotBeNull()
 
-            client.containers.stopContainer(containerId)
+            container.stop()
             delay(2.seconds)
             client.containerByName(containerName).shouldNotBeNull()
                 .state shouldBeSameInstanceAs Container.State.Existing.Stopped

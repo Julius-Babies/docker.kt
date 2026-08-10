@@ -2,8 +2,8 @@ package es.jvbabi.docker.kt.api.container
 
 import es.jvbabi.docker.kt.api.Container
 import es.jvbabi.docker.kt.api.Network
-import es.jvbabi.docker.kt.api.container.api.DockerContainer
-import es.jvbabi.docker.kt.api.container.api.Inspect
+import es.jvbabi.docker.kt.dto.DockerContainer
+import es.jvbabi.docker.kt.dto.Inspect
 import es.jvbabi.docker.kt.api.container.functions.*
 import es.jvbabi.docker.kt.api.network.functions.internalGetNetworksRequest
 import es.jvbabi.docker.kt.docker.DockerClient
@@ -157,26 +157,12 @@ class ContainerApi internal constructor(private val client: DockerClient) {
             null -> throw RuntimeException("Unknown container state: $this")
         }
 
-    /**
-     * Starts a container.
-     * @param containerId The ID of the container to start
-     * @param exceptionOnAlreadyRunning If true, throws an exception if the container is already running
-     * @throws ContainerAlreadyRunningException if the container is already running and if [exceptionOnAlreadyRunning] is true
-     */
-    suspend fun startContainer(containerId: String, exceptionOnAlreadyRunning: Boolean = false) =
-        startContainerInternal(client, containerId, exceptionOnAlreadyRunning)
-
-    suspend fun stopContainer(id: String) = stopContainer(client, id)
-
     suspend fun restartContainer(id: String) = restartContainer(client, id)
-
-    suspend fun killContainer(id: String) = killContainer(client, id)
-
-    suspend fun pauseContainer(id: String) = pauseContainer(client, id)
 
     suspend fun deleteContainer(id: String) = deleteContainer(client, id)
 
-    suspend fun inspectContainer(id: String) = inspectContainer(client, id)
+    /** Not public: [Inspect] is a wire type. Use [getById] for a container to work with. */
+    internal suspend fun inspectContainer(id: String) = inspectContainer(client, id)
 
     suspend fun runCommand(
         containerId: String,

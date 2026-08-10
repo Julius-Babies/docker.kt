@@ -1,6 +1,6 @@
 package es.jvbabi.docker.kt.api.container.functions
 
-import es.jvbabi.docker.kt.api.container.api.Inspect
+import es.jvbabi.docker.kt.dto.Inspect
 import es.jvbabi.docker.kt.docker.DockerClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.ClientRequestException

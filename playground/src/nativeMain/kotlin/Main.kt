@@ -19,9 +19,7 @@ fun main() {
             val postgres = dockerClient.containers.getContainers(all = true)
                 .onEach { println(it) }
                 .firstOrNull { it.name == "werkbank-postgres-18" }
-            dockerClient.containers.inspectContainer(postgres!!.id).let {
-                println(it.networkSettings.networks.map { it.value.aliases })
-            }
+            println(postgres!!.networks.map { it.network.name to it.aliases })
 
             println("\n=== Networks ===")
             val networks = dockerClient.networks.getNetworks()
@@ -34,9 +32,9 @@ fun main() {
             // Create test container
             dockerClient.images.pull("postgres:18.1-alpine3.22", onDownload = { _, _ -> })
             println("Creating test container...")
-            var containerId = dockerClient.containers.getContainers(all = true)
-                .firstOrNull { it.name == "testcontainer" }?.id
-            if (containerId == null) dockerClient.containerBuilder("postgres:18.1-alpine3.22") {
+            var testContainer = dockerClient.containers.getContainers(all = true)
+                .firstOrNull { it.name == "testcontainer" }
+            if (testContainer == null) dockerClient.containerBuilder("postgres:18.1-alpine3.22") {
                 name = "testcontainer"
 
                 volumes {
@@ -47,12 +45,13 @@ fun main() {
                     put("POSTGRES_PASSWORD", "testpw")
                 }
             }.create()
-            containerId = dockerClient.containers.getContainers(all = true).firstOrNull { it.name == "testcontainer" }?.id
-            requireNotNull(containerId)
+            testContainer = dockerClient.containers.getContainers(all = true).firstOrNull { it.name == "testcontainer" }
+            requireNotNull(testContainer)
+            val containerId = testContainer.id
             coroutineScope {
-                launch { dockerClient.containers.startContainer(containerId) }
+                launch { testContainer.start() }
                 repeat(10) {
-                    println(dockerClient.containers.inspectContainer(containerId).state.status)
+                    println(dockerClient.containers.getById(containerId)?.state)
                     delay(100.milliseconds)
                 }
             }

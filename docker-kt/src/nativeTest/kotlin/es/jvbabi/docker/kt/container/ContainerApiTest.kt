@@ -103,12 +103,12 @@ class ContainerApiTest : FunSpec({
             container!!.state shouldBe Container.State.Existing.Created
 
             // Start container
-            client.containers.startContainer(container.id)
+            container.start()
             container = findContainer(client, testContainerName)
             container!!.state shouldBe Container.State.Existing.Running
 
             // Stop container
-            client.containers.stopContainer(container.id)
+            container.stop()
             delay(2.seconds)
             var stoppedContainer = findContainer(client, testContainerName)
             stoppedContainer!!.state shouldBe Container.State.Existing.Stopped
@@ -124,8 +124,8 @@ class ContainerApiTest : FunSpec({
 
             // Create and start container
             client.containerBuilder(testImageName) { name = testContainerName }.create()
-            var container = findContainer(client, testContainerName)!!
-            client.containers.startContainer(container.id)
+            val container = findContainer(client, testContainerName)!!
+            container.start()
 
             // Restart container
             client.containers.restartContainer(container.id)
@@ -145,16 +145,16 @@ class ContainerApiTest : FunSpec({
 
             // Create and start container
             client.containerBuilder(testImageName) { name = testContainerName }.create()
-            var container = findContainer(client, testContainerName)!!
-            client.containers.startContainer(container.id)
+            val container = findContainer(client, testContainerName)!!
+            container.start()
 
             // Pause container
-            client.containers.pauseContainer(container.id)
+            container.pause()
             val pausedContainer = findContainer(client, testContainerName)!!
             pausedContainer.state shouldBe Container.State.Existing.Paused
 
             // Kill container (auch pausierte Container können gekillt werden)
-            client.containers.killContainer(container.id)
+            container.kill()
             delay(500)
 
             val killedContainer = findContainer(client, testContainerName)!!
@@ -234,7 +234,7 @@ private suspend fun cleanupTestContainer(client: DockerClient, name: String) {
             if (container.state is Container.State.Existing.Running ||
                 container.state is Container.State.Existing.Paused
             ) {
-                client.containers.killContainer(container.id)
+                container.kill()
                 delay(2.seconds)
             }
             client.containers.deleteContainer(container.id)
