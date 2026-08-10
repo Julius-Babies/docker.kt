@@ -6,6 +6,7 @@ import es.jvbabi.docker.kt.api.Container.VolumeBind
 import es.jvbabi.docker.kt.api.image.ImageNotFoundException
 import es.jvbabi.docker.kt.docker.DockerClient
 import io.ktor.client.call.body
+import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -127,20 +128,22 @@ internal suspend fun createContainerInternal(
         if (name != null) parameters.append("name", name)
     }
 
-    return dockerClient.socket.preparePost(url.build()) {
-        contentType(ContentType.Application.Json)
-        setBody(request)
-    }.execute { response ->
-        if (response.status == HttpStatusCode.NotFound) {
-            // Docker returns 404 if the image does not exist
-            throw ImageNotFoundException(image)
-        }
+    return try {
+        dockerClient.socket.preparePost(url.build()) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.execute { response ->
+            if (!response.status.isSuccess()) {
+                throw RuntimeException("Failed to create container: ${response.status.value} ${response.bodyAsText()}")
+            }
 
-        if (!response.status.isSuccess()) {
-            throw RuntimeException("Failed to create container: ${response.status.value} ${response.bodyAsText()}")
+            response.body<CreateContainerResponse>().id
         }
-
-        response.body<CreateContainerResponse>().id
+    } catch (e: ClientRequestException) {
+        // The client runs with expectSuccess, so the response never reaches the block above with a
+        // 404 on it - Docker's way of saying it does not have the image.
+        if (e.response.status == HttpStatusCode.NotFound) throw ImageNotFoundException(image)
+        throw e
     }
 }
 

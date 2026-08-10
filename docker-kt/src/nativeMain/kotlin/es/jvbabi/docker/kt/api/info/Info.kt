@@ -60,7 +60,8 @@ data class DockerInfo(
     @SerialName("InitCommit") val initCommit: CommitInfo,
     @SerialName("SecurityOptions") val securityOptions: List<String> = emptyList(),
     @SerialName("CDISpecDirs") val cdiSpecDirs: List<String> = emptyList(),
-    @SerialName("Warnings") val warnings: String? = null,
+    /** One entry per warning the daemon wants to raise, e.g. about missing cgroup support. */
+    @SerialName("Warnings") val warnings: List<String> = emptyList(),
 
     // New fields
     @SerialName("FirewallBackend") val firewallBackend: FirewallBackend? = null,
