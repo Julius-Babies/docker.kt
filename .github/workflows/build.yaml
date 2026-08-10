@@ -5,7 +5,49 @@ on:
       - 'v*.*.*'
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    # Integration tests wait on a daemon, so cap the run rather than let a hung one sit there.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        name: Checkout repository
+      - uses: actions/setup-java@v4
+        name: Setup Java
+        with:
+          java-version: '24'
+          distribution: 'temurin'
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # The linuxX64 target pulls in ktor-client-curl, so linking the test binary needs libcurl to
+      # resolve -lcurl. The runner image carries it, but not as a guarantee worth a failed release.
+      - name: Install libcurl
+        run: sudo apt-get install -y --no-install-recommends libcurl4-openssl-dev
+
+      # Most specs talk to a real daemon. GitHub's ubuntu runners ship one, already running and
+      # reachable by the runner user - fail loudly here rather than in a spec if that ever changes.
+      - name: Check the Docker daemon is up
+        run: docker version
+
+      # allTests runs whatever the host can run: on this runner that is linuxX64Test, and the other
+      # native targets are skipped rather than failing.
+      - name: Run tests
+        run: ./gradlew :docker-kt:allTests
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: docker-kt/build/reports/tests/
+          retention-days: 7
+
   publish:
+    # No release goes out on a red suite.
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: read
