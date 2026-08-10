@@ -3,6 +3,8 @@ on:
   push:
     tags:
       - 'v*.*.*'
+  # Runs the test job on demand, against any branch, without having to tag a release for it.
+  workflow_dispatch:
 
 jobs:
   test:
@@ -48,6 +50,9 @@ jobs:
   publish:
     # No release goes out on a red suite.
     needs: test
+    # Only a tag releases. A manual run has no version to publish under - it would take the branch
+    # name and push that to Maven Central.
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     permissions:
       contents: read
