@@ -30,8 +30,7 @@ fun testResourceName(role: String): String = "docker-kt-$role-$testRunId"
 suspend fun <T> withDocker(block: suspend (DockerClient) -> T): T = DockerClient().use { block(it) }
 
 /** The container with exactly this name, or null. */
-suspend fun DockerClient.containerByName(name: String): Container? =
-    containers.getContainers(all = true).find { it.name == name }
+suspend fun DockerClient.containerByName(name: String): Container? = containers.getByName(name)
 
 /**
  * Pulls [image] unless the host already has that exact tag.

@@ -375,7 +375,7 @@ class Container internal constructor(
              * container is created - see [Container.create].
              */
             fun connect(network: Network, containerAliases: List<String> = emptyList()) {
-                networks.add(Container.NetworkConfig(network, containerAliases))
+                networks.add(NetworkConfig(network, containerAliases))
             }
         }
 
@@ -502,8 +502,17 @@ class Container internal constructor(
         }
     }
 
+    /**
+     * One endpoint: the [network] a container is attached to, and how it appears on it.
+     *
+     * The addresses only hold while the container runs - Docker assigns them on start and releases
+     * them again on stop, so a container that is merely created, or was stopped again, reports none.
+     * A network without IPv6 leaves [ipv6Address] null, and the other way round.
+     */
     data class NetworkConfig(
         val network: Network,
-        val aliases: List<String> = emptyList()
+        val aliases: List<String> = emptyList(),
+        val ipv4Address: String? = null,
+        val ipv6Address: String? = null
     )
 }

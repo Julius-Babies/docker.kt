@@ -2,16 +2,13 @@ package es.jvbabi.docker.kt.api.container
 
 import es.jvbabi.docker.kt.api.Container
 import es.jvbabi.docker.kt.api.Network
-import es.jvbabi.docker.kt.dto.DockerContainer
-import es.jvbabi.docker.kt.dto.Inspect
 import es.jvbabi.docker.kt.api.container.functions.*
 import es.jvbabi.docker.kt.api.network.functions.internalGetNetworksRequest
 import es.jvbabi.docker.kt.docker.DockerClient
+import es.jvbabi.docker.kt.dto.Inspect
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.flow.Flow
-import kotlin.time.Duration
 import kotlin.time.Duration.Companion.nanoseconds
-import kotlin.time.Duration.Companion.seconds
 
 class ContainerApi internal constructor(private val client: DockerClient) {
     /**
@@ -45,8 +42,21 @@ class ContainerApi internal constructor(private val client: DockerClient) {
      *
      * @return null if the daemon does not know that id
      */
-    suspend fun getById(id: String): Container? {
-        val inspect = inspectContainerOrNull(client, id) ?: return null
+    suspend fun getById(id: String): Container? = get(id)
+
+    /**
+     * Looks up a container by the name it was created with, the same way [getById] hands them out.
+     *
+     * Far cheaper than picking one out of [getContainers]: that lists every container and inspects
+     * each of them, while this asks the daemon for the one it means.
+     *
+     * @return null if the daemon does not know that name
+     */
+    suspend fun getByName(name: String): Container? = get(name)
+
+    /** Docker resolves an id and a name on the same endpoint, so both ways in share this. */
+    private suspend fun get(reference: String): Container? {
+        val inspect = inspectContainerOrNull(client, reference) ?: return null
         return inspect.toContainer(networksFor(inspect))
     }
 
@@ -134,7 +144,13 @@ class ContainerApi internal constructor(private val client: DockerClient) {
                 // normally happen either: Docker refuses to remove a network still in use.
                 ?: return@mapNotNull null
 
-            Container.NetworkConfig(network = network, aliases = endpoint.aliases.orEmpty())
+            Container.NetworkConfig(
+                network = network,
+                aliases = endpoint.aliases.orEmpty(),
+                // Docker sends what does not apply as an empty string rather than leaving it out.
+                ipv4Address = endpoint.ipAddress.takeIf { it.isNotEmpty() },
+                ipv6Address = endpoint.globalIPv6Address.takeIf { it.isNotEmpty() }
+            )
         }
 
     /** Parses Docker's `"80/tcp"` port notation. */
@@ -158,8 +174,6 @@ class ContainerApi internal constructor(private val client: DockerClient) {
         }
 
     suspend fun restartContainer(id: String) = restartContainer(client, id)
-
-    suspend fun deleteContainer(id: String) = deleteContainer(client, id)
 
     /** Not public: [Inspect] is a wire type. Use [getById] for a container to work with. */
     internal suspend fun inspectContainer(id: String) = inspectContainer(client, id)
@@ -228,43 +242,6 @@ object Container {
                     containerPort = containerPort.toInt(),
                     protocol = Protocol.TCP
                 )
-            }
-        }
-    }
-
-    data class NetworkConfig(
-        val networkId: String,
-        val aliases: List<String> = emptyList()
-    )
-
-    sealed class VolumeBind {
-        abstract val readOnly: Boolean
-
-        data class Host(
-            val path: String,
-            override val readOnly: Boolean = false
-        ) : VolumeBind()
-
-        data class Volume(
-            val name: String,
-            override val readOnly: Boolean = false
-        ) : VolumeBind()
-
-        companion object {
-            fun from(input: String): Pair<VolumeBind, String> {
-                when (input.count { it == ':' }) {
-                    1 -> {
-                        val (host, container) = input.split(":")
-                        return Host(host, false) to container
-                    }
-
-                    2 -> {
-                        val (host, container, readOnly) = input.split(":")
-                        return Host(host, readOnly.lowercase() == "ro") to container
-                    }
-
-                    else -> error("Invalid volume bind: $input")
-                }
             }
         }
     }

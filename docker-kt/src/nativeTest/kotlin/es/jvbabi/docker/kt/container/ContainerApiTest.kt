@@ -12,6 +12,8 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotContain
+import io.kotest.matchers.nulls.shouldBeNull
+import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
@@ -101,5 +103,25 @@ class ContainerApiTest : FunSpec({
             // Whatever status the daemon reported, it mapped onto a state that means "it is there".
             listed.state.shouldBeInstanceOf<Container.State.Existing>()
         }
+    }
+
+    test("getByName finds the same container as getById") {
+        val byName = client.containers.getByName(containerName).shouldNotBeNull()
+
+        byName.id shouldBe container.id
+        byName.name shouldBe containerName
+        // Reached without the leading slash inspect reports the name with.
+        client.containers.getById(container.id).shouldNotBeNull().name shouldBe byName.name
+    }
+
+    test("getByName finds a stopped container too") {
+        // The listing hides it by default, but a lookup by name is not a listing.
+        container.state.shouldBeInstanceOf<Container.State.Existing.Stopped>()
+
+        client.containers.getByName(containerName).shouldNotBeNull().id shouldBe container.id
+    }
+
+    test("getByName returns null for a name the daemon does not know") {
+        client.containers.getByName("$containerName-no-such-container").shouldBeNull()
     }
 })
